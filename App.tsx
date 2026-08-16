@@ -1,20 +1,105 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import RemoteShell from './src/components/RemoteShell';
+import SetupScreen from './src/components/SetupScreen';
+import { parseConnectDeepLink, resolveInitialUrl } from './src/lib/remote-url';
+import { clearRemoteUrl, loadRemoteUrl, saveRemoteUrl } from './src/lib/secure-remote-store';
+
+const configuredRemoteUrl = process.env.EXPO_PUBLIC_ZCODE_REMOTE_URL ?? '';
+
+const initialSafeAreaMetrics = {
+  frame: { x: 0, y: 0, width: 0, height: 0 },
+  insets: { top: 0, bottom: 0, left: 0, right: 0 },
+};
 
 export default function App() {
+  const [ready, setReady] = useState(false);
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+  const [webViewSession, setWebViewSession] = useState(0);
+
+  const connect = useCallback(async (url: string) => {
+    setRemoteUrl(url);
+    setWebViewSession((session) => session + 1);
+    await saveRemoteUrl(url);
+  }, []);
+
+  const handleUrlEvent = useCallback(
+    (event: { url: string }) => {
+      const target = parseConnectDeepLink(event.url);
+
+      if (target) {
+        void connect(target);
+      }
+    },
+    [connect],
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    const bootstrap = async () => {
+      const [stored, initialLink] = await Promise.all([
+        loadRemoteUrl(),
+        Linking.getInitialURL().catch(() => null),
+      ]);
+      const linked = initialLink ? parseConnectDeepLink(initialLink) : null;
+
+      if (linked) {
+        void saveRemoteUrl(linked);
+      }
+
+      const initial = resolveInitialUrl({
+        stored: linked ?? stored,
+        configured: configuredRemoteUrl,
+      });
+
+      if (!active) {
+        return;
+      }
+
+      setRemoteUrl(initial);
+      setReady(true);
+    };
+
+    void bootstrap();
+
+    const subscription = Linking.addEventListener('url', handleUrlEvent);
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [handleUrlEvent]);
+
+  const setup = useCallback(async () => {
+    await clearRemoteUrl();
+    setRemoteUrl(null);
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider initialMetrics={initialSafeAreaMetrics}>
+      <StatusBar style="light" />
+      {ready ? (
+        remoteUrl ? (
+          <RemoteShell
+            key={webViewSession}
+            remoteUrl={remoteUrl}
+            onSetup={setup}
+          />
+        ) : (
+          <SetupScreen onConnect={connect} />
+        )
+      ) : (
+        <View style={styles.boot}>
+          <ActivityIndicator color="#8ab4ff" size="large" />
+        </View>
+      )}
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  boot: { alignItems: 'center', backgroundColor: '#080b12', flex: 1, justifyContent: 'center' },
 });

@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 import { resolveNavigationTarget } from '../lib/navigation';
 import ErrorScreen from './ErrorScreen';
@@ -66,7 +67,7 @@ export default function RemoteShell({ remoteUrl, onSetup }: RemoteShellProps) {
   }, [canGoBack]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <WebView
         ref={webViewRef}
         source={{ uri: sourceUri }}
@@ -122,7 +123,7 @@ export default function RemoteShell({ remoteUrl, onSetup }: RemoteShellProps) {
         textZoom={100}
         overScrollMode="never"
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

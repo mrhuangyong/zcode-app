@@ -1,5 +1,6 @@
 import { act, render } from '@testing-library/react-native';
 import { Linking } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewProps } from 'react-native-webview';
 import RemoteShell from './RemoteShell';
 
@@ -9,7 +10,15 @@ jest.mock('react-native-webview', () => ({
   __esModule: true,
   default: jest.fn(() => null),
 }));
+
+jest.mock('react-native-safe-area-context', () => {
+  const React = jest.requireActual('react');
+  return {
+    SafeAreaView: jest.fn(({ children }) => <>{children}</>),
+  };
+});
 const webViewMock = WebView as unknown as jest.Mock;
+const safeAreaViewMock = SafeAreaView as unknown as jest.Mock;
 
 const remoteUrl =
   'https://zcode.z.ai/remote/v4?sid=session-id&hash=encoded%2Fvalue%3D&t=1&mid=mid&name=Mac.local&app_version=3.7.7';
@@ -30,6 +39,17 @@ describe('RemoteShell', () => {
     expect(props.allowsInlineMediaPlayback).toBe(true);
     expect(props.originWhitelist).toEqual(expect.arrayContaining(['https://zcode.z.ai', 'about:*', 'data:*', 'blob:*']));
     expect(props.applicationNameForUserAgent).toContain('ZCodeMobile');
+  });
+
+  it('keeps WebView content below the system status bar', async () => {
+    await render(<RemoteShell remoteUrl={remoteUrl} />);
+
+    expect(safeAreaViewMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        edges: expect.arrayContaining(['top']),
+      }),
+      undefined,
+    );
   });
 
   it('uses the navigation policy for WebView and external links', async () => {

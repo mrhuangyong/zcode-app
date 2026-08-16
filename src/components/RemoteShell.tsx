@@ -101,6 +101,12 @@ export default function RemoteShell({ remoteUrl, onSetup }: RemoteShellProps) {
         )}
         onShouldStartLoadWithRequest={shouldStartLoad}
         onNavigationStateChange={(event) => setCanGoBack(event.canGoBack)}
+        onFileDownload={(event) => {
+          const url = event.nativeEvent.downloadUrl;
+          if (resolveNavigationTarget(url) !== 'blocked') {
+            void openExternal(url);
+          }
+        }}
         onOpenWindow={(event) => {
           const url = event.nativeEvent.targetUrl;
           const target = resolveNavigationTarget(url);

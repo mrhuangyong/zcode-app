@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="64" x2="928" y2="976" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17223A"/>
+      <stop offset="0.58" stop-color="#080B12"/>
+      <stop offset="1" stop-color="#05070D"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.52" cy="0.42" r="0.62">
+      <stop stop-color="#2E77FF" stop-opacity="0.75"/>
+      <stop offset="0.66" stop-color="#155EE3" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#155EE3" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mark" x1="272" y1="292" x2="760" y2="776" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.56" stop-color="#DCEBFF"/>
+      <stop offset="1" stop-color="#78AFFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="340" fill="url(#glow)"/>
+  <rect x="62" y="62" width="900" height="900" rx="214" fill="none" stroke="#3F72D8" stroke-opacity="0.52" stroke-width="18"/>
+  <path d="M285 310h454v94L466 664h273v96H285v-96l273-260H285z" fill="url(#mark)"/>
+  <circle cx="770" cy="760" r="26" fill="#8AB4FF"/>
+</svg>

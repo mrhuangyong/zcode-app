@@ -7,7 +7,7 @@ import {
 } from './remote-url';
 
 const remoteUrl =
-  'https://zcode.z.ai/remote/v4?sid=session-id&hash=encoded%2Fvalue%3D&t=1786803761869&mid=729fe692-5067-4ba0-af0f-4d0b3843b03e&name=mrhuadeMacBook-Pro.local&app_version=3.7.7';
+  'https://zcode.z.ai/remote/v4?sid=session-id&hash=encoded%2Fvalue%3D&t=1234567890&mid=00000000-0000-4000-8000-000000000000&name=mrhuadeMacBook-Pro.local&app_version=3.7.7';
 
 describe('remote URL policy', () => {
   it('accepts only the official HTTPS ZCode remote route', () => {

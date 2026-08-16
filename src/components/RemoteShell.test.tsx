@@ -1,15 +1,14 @@
+import { act, render } from '@testing-library/react-native';
+import { Linking } from 'react-native';
+import WebView, { type WebViewProps } from 'react-native-webview';
+import RemoteShell from './RemoteShell';
+
 jest.mock('expo-keep-awake', () => ({ useKeepAwake: jest.fn() }));
 
 jest.mock('react-native-webview', () => ({
   __esModule: true,
   default: jest.fn(() => null),
 }));
-
-import { act, render } from '@testing-library/react-native';
-import { Linking } from 'react-native';
-import WebView, { type WebViewProps } from 'react-native-webview';
-import RemoteShell from './RemoteShell';
-
 const webViewMock = WebView as unknown as jest.Mock;
 
 const remoteUrl =

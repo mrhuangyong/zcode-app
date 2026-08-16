@@ -1,9 +1,3 @@
-jest.mock('expo-secure-store', () => ({
-  deleteItemAsync: jest.fn(),
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-}));
-
 import * as secureStore from 'expo-secure-store';
 import { STORAGE_KEY } from './remote-url';
 import { clearRemoteUrl, loadRemoteUrl, saveRemoteUrl } from './secure-remote-store';
@@ -11,6 +5,11 @@ import { clearRemoteUrl, loadRemoteUrl, saveRemoteUrl } from './secure-remote-st
 const remoteUrl =
   'https://zcode.z.ai/remote/v4?sid=session-id&hash=encoded%2Fvalue%3D&t=1&mid=mid&name=Mac.local&app_version=3.7.7';
 
+jest.mock('expo-secure-store', () => ({
+  deleteItemAsync: jest.fn(),
+  getItemAsync: jest.fn(),
+  setItemAsync: jest.fn(),
+}));
 const getItemAsync = secureStore.getItemAsync as jest.Mock;
 const setItemAsync = secureStore.setItemAsync as jest.Mock;
 const deleteItemAsync = secureStore.deleteItemAsync as jest.Mock;

@@ -23,10 +23,6 @@ export default function RemoteShell({ remoteUrl, onSetup }: RemoteShellProps) {
   const [sourceUri, setSourceUri] = useState(remoteUrl);
   const [canGoBack, setCanGoBack] = useState(false);
 
-  useEffect(() => {
-    setSourceUri(remoteUrl);
-  }, [remoteUrl]);
-
   const openExternal = useCallback(async (url: string) => {
     try {
       await Linking.openURL(url);

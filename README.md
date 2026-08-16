@@ -51,6 +51,16 @@ npm run prebuild:ios
 npm run prebuild:android
 ```
 
+## 本机构建产物
+
+当前本机已生成并验证：
+
+- Android APK：`android/app/build/outputs/apk/release/app-release.apk`
+- iOS Simulator App：`ios/build/Build/Products/Release-iphonesimulator/ZCodeRemote.app`
+- Web 静态包：`dist/`
+
+这些目录按 Expo 约定被 Git 忽略；源码提交中包含完整的可复现构建配置。
+
 ## 安全与功能边界
 
 - 只允许加载 `https://zcode.z.ai/remote/v4`。

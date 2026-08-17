@@ -14,9 +14,10 @@ import { normalizeRemoteUrl, redactRemoteUrl } from '../lib/remote-url';
 
 type SetupScreenProps = {
   onConnect: (url: string) => void | Promise<void>;
+  onScanRequest: () => void;
 };
 
-export default function SetupScreen({ onConnect }: SetupScreenProps) {
+export default function SetupScreen({ onConnect, onScanRequest }: SetupScreenProps) {
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const normalized = normalizeRemoteUrl(value);
@@ -45,6 +46,16 @@ export default function SetupScreen({ onConnect }: SetupScreenProps) {
           </Text>
 
           <View style={styles.card}>
+            <Pressable
+              testID="open-scanner-button"
+              accessibilityRole="button"
+              accessibilityLabel="扫码连接 ZCode"
+              onPress={onScanRequest}
+              style={({ pressed }) => [styles.scanButton, pressed && styles.pressedButton]}
+            >
+              <Text style={styles.scanButtonText}>扫码连接 ZCode</Text>
+            </Pressable>
+            <View style={styles.divider} />
             <Text style={styles.label}>远控链接</Text>
             <TextInput
               testID="remote-url-input"
@@ -144,6 +155,14 @@ const styles = StyleSheet.create({
   error: { color: '#ff9188', fontSize: 13, lineHeight: 19 },
   preview: { color: '#7d8aa5', fontSize: 12, lineHeight: 18 },
   security: { color: '#667085', fontSize: 12, lineHeight: 18 },
+  scanButton: {
+    alignItems: 'center',
+    backgroundColor: '#155ee3',
+    borderRadius: 15,
+    paddingVertical: 15,
+  },
+  scanButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
+  divider: { backgroundColor: 'rgba(96,112,150,0.28)', height: 1 },
   primaryButton: {
     backgroundColor: '#155ee3',
     alignItems: 'center',

@@ -67,9 +67,10 @@ export function parseConnectDeepLink(input: string): string | null {
   return target ? normalizeRemoteUrl(target) : null;
 }
 
-export function resolveInitialUrl(options: {
-  stored?: string | null;
-  configured?: string | null;
-}): string | null {
-  return normalizeRemoteUrl(options.stored ?? '') ?? normalizeRemoteUrl(options.configured ?? '');
+export function resolveInitialUrl(options: { stored?: string | null }): string | null {
+  return normalizeRemoteUrl(options.stored ?? '');
+}
+
+export function resolveScannedRemoteConnection(input: string): string | null {
+  return normalizeRemoteUrl(input) ?? parseConnectDeepLink(input);
 }

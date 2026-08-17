@@ -9,13 +9,13 @@ npm install
 npx expo start
 ```
 
-用 Expo Go 扫描终端二维码即可运行。首次启动会按以下优先级获取链接：
+用 Expo Go 扫描终端二维码即可运行。首次启动不会内置任何远控 URL：
 
-1. iOS / Android 安全存储中的链接；
-2. `.env.local` 中的 `EXPO_PUBLIC_ZCODE_REMOTE_URL`；
-3. 若都没有，显示本机链接设置页。
+1. 先读取 iOS / Android 安全存储中的历史链接；
+2. 若处理启动深链，则校验并保存深链中的 URL；
+3. 若都没有，显示扫码优先的本机连接引导页。
 
-`.env.local` 被 Git 忽略。可以复制 `.env.example` 后填入桌面端生成的远控 URL。链接包含会话凭据，请勿提交、截图或转发。
+远控 URL 只能通过桌面端二维码、手动粘贴或 `zcode-mobile://connect?...` 深链进入 App。构建过程不读取、不注入、不打包 `EXPO_PUBLIC_ZCODE_REMOTE_URL`。
 
 ## 深链
 
@@ -64,7 +64,7 @@ npm run prebuild:android
 ## 安全与功能边界
 
 - 只允许加载 `https://zcode.z.ai/remote/v4`。
-- 远控链接使用系统安全存储，界面只显示脱敏预览。
+- 远控链接使用系统安全存储，界面只显示脱敏预览；构建包不内置任何远控链接。
 - 官方域内导航留在 WebView；文档、支付等外部链接交给系统浏览器。
 - JavaScript、Cookie、DOM Storage、文件选择器、摄像头/麦克风权限与内联媒体保持开启。
 - Android 后退键优先回退 WebView 历史，不能回退时才退出。

@@ -4,7 +4,9 @@ import {
   BackHandler,
   Linking,
   Platform,
+  Pressable,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -15,10 +17,11 @@ import ErrorScreen from './ErrorScreen';
 
 type RemoteShellProps = {
   remoteUrl: string;
+  onScanRequest: () => void;
   onSetup?: () => void;
 };
 
-export default function RemoteShell({ remoteUrl, onSetup }: RemoteShellProps) {
+export default function RemoteShell({ remoteUrl, onScanRequest, onSetup }: RemoteShellProps) {
   useKeepAwake();
   const webViewRef = useRef<React.ComponentRef<typeof WebView>>(null);
   const [sourceUri, setSourceUri] = useState(remoteUrl);
@@ -68,6 +71,18 @@ export default function RemoteShell({ remoteUrl, onSetup }: RemoteShellProps) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+      <View style={styles.shellHeader}>
+        <Text style={styles.shellHeaderText}>ZCode Remote</Text>
+        <Pressable
+          testID="open-scanner-button"
+          accessibilityRole="button"
+          accessibilityLabel="扫码连接新桌面"
+          onPress={onScanRequest}
+          style={({ pressed }) => [styles.scanButton, pressed && styles.pressedButton]}
+        >
+          <Text style={styles.scanButtonText}>扫码</Text>
+        </Pressable>
+      </View>
       <WebView
         ref={webViewRef}
         source={{ uri: sourceUri }}
@@ -129,6 +144,27 @@ export default function RemoteShell({ remoteUrl, onSetup }: RemoteShellProps) {
 
 const styles = StyleSheet.create({
   container: { backgroundColor: '#080b12', flex: 1 },
+  shellHeader: {
+    alignItems: 'center',
+    backgroundColor: '#0B0F18',
+    borderColor: 'rgba(96,112,150,0.24)',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  shellHeaderText: { color: '#e7eaf3', fontSize: 15, fontWeight: '700' },
+  scanButton: {
+    alignItems: 'center',
+    backgroundColor: '#155ee3',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  scanButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  pressedButton: { opacity: 0.76 },
   webView: { backgroundColor: '#080b12', flex: 1 },
   loading: { alignItems: 'center', backgroundColor: '#080b12', flex: 1, justifyContent: 'center' },
 });

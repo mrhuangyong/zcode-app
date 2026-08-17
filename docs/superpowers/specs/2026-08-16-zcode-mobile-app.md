@@ -33,7 +33,7 @@ flowchart LR
 
 ## 用户流程
 
-1. 首次启动：读取本机构建的 `EXPO_PUBLIC_ZCODE_REMOTE_URL` 或 SecureStore 中保存的链接。
+1. 首次启动：只读取 SecureStore 中保存的链接。
 2. 没有配置时显示粘贴链接的设置页，只接受 `https://zcode.z.ai/remote/v4...`。
 3. 有配置时直接进入全屏官方 Web Remote。
 4. 深链 `zcode-mobile://connect?url=<encoded-url>` 可更新远控地址，便于从桌面端或二维码进入独立 APP。

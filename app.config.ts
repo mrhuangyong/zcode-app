@@ -51,6 +51,12 @@ const config: ExpoConfig = {
   },
   plugins: [
     [
+      'expo-camera',
+      {
+        cameraPermission: 'ZCode 使用相机扫描桌面端生成的连接二维码。',
+      },
+    ],
+    [
       'expo-splash-screen',
       {
         image: './assets/splash-icon.png',

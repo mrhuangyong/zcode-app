@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewProps } from 'react-native-webview';
@@ -29,7 +29,7 @@ beforeEach(() => {
 
 describe('RemoteShell', () => {
   it('loads the official remote app with full browser capabilities', async () => {
-    await render(<RemoteShell remoteUrl={remoteUrl} />);
+    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={jest.fn()} />);
 
     const props = webViewMock.mock.calls[0][0];
     expect(props.source).toEqual({ uri: remoteUrl });
@@ -42,7 +42,7 @@ describe('RemoteShell', () => {
   });
 
   it('keeps WebView content below the system status bar', async () => {
-    await render(<RemoteShell remoteUrl={remoteUrl} />);
+    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={jest.fn()} />);
 
     expect(safeAreaViewMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -52,8 +52,17 @@ describe('RemoteShell', () => {
     );
   });
 
+  it('offers a scanner entry while connected', async () => {
+    const onScanRequest = jest.fn();
+    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={onScanRequest} />);
+
+    await fireEvent.press(screen.getByTestId('open-scanner-button'));
+
+    expect(onScanRequest).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the navigation policy for WebView and external links', async () => {
-    await render(<RemoteShell remoteUrl={remoteUrl} />);
+    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={jest.fn()} />);
 
     const decide = webViewMock.mock.calls[0][0].onShouldStartLoadWithRequest;
 
@@ -66,7 +75,7 @@ describe('RemoteShell', () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await act(async () => {});
     openURL.mockClear();
-    await render(<RemoteShell remoteUrl={remoteUrl} />);
+    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={jest.fn()} />);
 
     const props = webViewMock.mock.calls[0][0];
     const event = {

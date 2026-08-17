@@ -3,11 +3,10 @@ import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RemoteShell from './src/components/RemoteShell';
+import QRScannerScreen from './src/components/QRScannerScreen';
 import SetupScreen from './src/components/SetupScreen';
 import { parseConnectDeepLink, resolveInitialUrl } from './src/lib/remote-url';
 import { clearRemoteUrl, loadRemoteUrl, saveRemoteUrl } from './src/lib/secure-remote-store';
-
-const configuredRemoteUrl = process.env.EXPO_PUBLIC_ZCODE_REMOTE_URL ?? '';
 
 const initialSafeAreaMetrics = {
   frame: { x: 0, y: 0, width: 0, height: 0 },
@@ -18,12 +17,29 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
   const [webViewSession, setWebViewSession] = useState(0);
+  const [scannerVisible, setScannerVisible] = useState(false);
 
   const connect = useCallback(async (url: string) => {
     setRemoteUrl(url);
     setWebViewSession((session) => session + 1);
     await saveRemoteUrl(url);
   }, []);
+
+  const openScanner = useCallback(() => {
+    setScannerVisible(true);
+  }, []);
+
+  const closeScanner = useCallback(() => {
+    setScannerVisible(false);
+  }, []);
+
+  const connectFromScanner = useCallback(
+    async (url: string) => {
+      await connect(url);
+      setScannerVisible(false);
+    },
+    [connect],
+  );
 
   const handleUrlEvent = useCallback(
     (event: { url: string }) => {
@@ -50,10 +66,7 @@ export default function App() {
         void saveRemoteUrl(linked);
       }
 
-      const initial = resolveInitialUrl({
-        stored: linked ?? stored,
-        configured: configuredRemoteUrl,
-      });
+      const initial = resolveInitialUrl({ stored: linked ?? stored });
 
       if (!active) {
         return;
@@ -86,16 +99,22 @@ export default function App() {
           <RemoteShell
             key={webViewSession}
             remoteUrl={remoteUrl}
+            onScanRequest={openScanner}
             onSetup={setup}
           />
         ) : (
-          <SetupScreen onConnect={connect} />
+          <SetupScreen onConnect={connect} onScanRequest={openScanner} />
         )
       ) : (
         <View style={styles.boot}>
           <ActivityIndicator color="#8ab4ff" size="large" />
         </View>
       )}
+      <QRScannerScreen
+        visible={scannerVisible}
+        onClose={closeScanner}
+        onConnect={connectFromScanner}
+      />
     </SafeAreaProvider>
   );
 }

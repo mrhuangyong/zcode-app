@@ -5,12 +5,12 @@
 - 技术栈：Expo React Native + TypeScript + `react-native-webview`。
 - 项目名：`ZCode Remote`，scheme：`zcode-mobile`。
 - 官方 Web 前端是唯一业务功能实现，原生层只做壳和系统集成。
-- 会话 URL 不写入 Git，不输出到日志；本机可放在 `.env.local`。
+- 会话 URL 不写入 Git、源码、环境变量或构建产物。
 
 ## 文件结构
 
 - `app.json`：App 名称、图标、scheme、iOS/Android 配置。
-- `app.config.ts`：读取 `EXPO_PUBLIC_ZCODE_REMOTE_URL` 并注入 `extra.defaultRemoteUrl`。
+- `app.config.ts`：只负责原生 App 配置，不读取或注入远控 URL。
 - `App.tsx`：入口与状态机（loading/configured/error）。
 - `src/lib/remote-url.ts`：纯函数 URL 校验、规范化、脱敏、深链解析。
 - `src/lib/remote-url.test.ts`：URL 行为测试。
@@ -19,14 +19,14 @@
 - `src/components/RemoteShell.tsx`：WebView、返回键、外部链接、错误恢复。
 - `src/components/SetupScreen.tsx`：安全链接配置界面。
 - `src/components/ErrorScreen.tsx`：连接错误界面。
-- `.env.example` / `.env.local`：本机私有配置模板与实际值。
+- 远控 URL 只来自扫码、手动输入或深链，不提供环境变量模板。
 
 ## Task 1 - 初始化 Expo 工程
 
 1. 在空目录生成 Expo blank TypeScript 项目。
 2. 安装运行依赖：`react-native-webview`、`expo-secure-store`、`expo-keep-awake`。
 3. 安装测试依赖：`jest`、`jest-expo`、`@types/jest`。
-4. 初始化 Git，加入 `.gitignore`，确保 `.env.local` 不入库。
+4. 初始化 Git，加入 `.gitignore`，并确认远控 URL 不进入源码或构建配置。
 5. 建立脚本：`test`、`typecheck`、`lint`。
 
 ## Task 2 - RED：先写 URL 测试
@@ -87,10 +87,10 @@ it('prefers stored URL over build-time URL')
 
 ## Task 6 - 深链与本机配置
 
-- `app.config.ts` 读取 `EXPO_PUBLIC_ZCODE_REMOTE_URL`。
+- `app.config.ts` 不读取任何远控 URL。
 - 启动和前台运行时监听 `zcode-mobile://connect?url=...`。
 - 新链接校验通过后保存到 SecureStore 并刷新 WebView。
-- `.env.example` 只包含空模板；`.env.local` 保存用户提供的一次性链接并被 Git 忽略。
+- 不提供 `.env.example` 或 `.env.local`；用户通过扫码/手动输入提供一次性链接。
 
 ## Task 7 - 验证
 

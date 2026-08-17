@@ -4,6 +4,7 @@ import {
   parseConnectDeepLink,
   redactRemoteUrl,
   resolveInitialUrl,
+  resolveScannedRemoteConnection,
 } from './remote-url';
 
 const remoteUrl =
@@ -53,16 +54,19 @@ describe('remote URL policy', () => {
     expect(parseConnectDeepLink('zcode-mobile://settings')).toBeNull();
   });
 
-  it('prefers stored URL over build-time URL and ignores unsafe values', () => {
+  it('resolves scanned remote URLs and connect deep links', () => {
+    expect(resolveScannedRemoteConnection(remoteUrl)).toBe(remoteUrl);
     expect(
-      resolveInitialUrl({
-        stored: remoteUrl,
-        configured: 'https://zcode.z.ai/remote/v4?sid=build',
-      }),
+      resolveScannedRemoteConnection(`zcode-mobile://connect?url=${encodeURIComponent(remoteUrl)}`),
     ).toBe(remoteUrl);
-    expect(resolveInitialUrl({ stored: 'https://evil.example', configured: remoteUrl })).toBe(remoteUrl);
-    expect(resolveInitialUrl({ stored: null, configured: remoteUrl })).toBe(remoteUrl);
-    expect(resolveInitialUrl({ stored: null, configured: 'https://evil.example' })).toBeNull();
+    expect(resolveScannedRemoteConnection('https://evil.example/remote/v4')).toBeNull();
+    expect(resolveScannedRemoteConnection('javascript:alert(1)')).toBeNull();
+  });
+
+  it('uses only a safely stored URL and has no build-time fallback', () => {
+    expect(resolveInitialUrl({ stored: remoteUrl })).toBe(remoteUrl);
+    expect(resolveInitialUrl({ stored: 'https://evil.example' })).toBeNull();
+    expect(resolveInitialUrl({ stored: null })).toBeNull();
     expect(resolveInitialUrl({})).toBeNull();
   });
 });

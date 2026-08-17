@@ -4,13 +4,15 @@ import SetupScreen from './SetupScreen';
 const remoteUrl =
   'https://zcode.z.ai/remote/v4?sid=session-id&hash=encoded%2Fvalue%3D&t=1&mid=mid&name=Mac.local&app_version=3.7.7';
 
-async function setup(onConnect = jest.fn()) {
-  await render(<SetupScreen onConnect={onConnect} />);
+async function setup(onConnect = jest.fn(), onScanRequest = jest.fn()) {
+  await render(<SetupScreen onConnect={onConnect} onScanRequest={onScanRequest} />);
 
   return {
     onConnect,
     input: screen.getByTestId('remote-url-input'),
     submit: screen.getByTestId('connect-button'),
+    scanner: screen.getByTestId('open-scanner-button'),
+    onScanRequest,
   };
 }
 
@@ -24,6 +26,14 @@ describe('SetupScreen', () => {
     expect(onConnect).toHaveBeenCalledTimes(1);
     expect(onConnect).toHaveBeenCalledWith(remoteUrl);
     expect(screen.getByText(/只保存在本机安全存储/)).toBeTruthy();
+  });
+
+  it('offers a scanner-first connection entry', async () => {
+    const { scanner, onScanRequest } = await setup();
+
+    await fireEvent.press(scanner);
+
+    expect(onScanRequest).toHaveBeenCalledTimes(1);
   });
 
   it('rejects unsafe URLs without invoking connect', async () => {

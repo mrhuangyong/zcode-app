@@ -1,5 +1,6 @@
 export const ZCODE_ORIGIN = 'https://zcode.z.ai';
 export const STORAGE_KEY = 'zcode.remote.url.v1';
+export const DEVICES_STORAGE_KEY = 'zcode.remote.devices.v1';
 
 const REMOTE_PATHS = new Set(['/remote/v4', '/remote/v4/']);
 
@@ -53,6 +54,12 @@ export function redactRemoteUrl(input: string): string {
   });
 
   return url.toString();
+}
+
+export function extractDeviceName(input: string): string | null {
+  const name = toSafeUrl(input)?.searchParams.get('name');
+  const trimmed = name?.trim();
+  return trimmed ? trimmed.slice(0, 40) : null;
 }
 
 export function parseConnectDeepLink(input: string): string | null {

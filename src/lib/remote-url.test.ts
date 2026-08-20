@@ -1,4 +1,5 @@
 import {
+  extractDeviceName,
   isSafeRemoteUrl,
   normalizeRemoteUrl,
   parseConnectDeepLink,
@@ -68,5 +69,17 @@ describe('remote URL policy', () => {
     expect(resolveInitialUrl({ stored: 'https://evil.example' })).toBeNull();
     expect(resolveInitialUrl({ stored: null })).toBeNull();
     expect(resolveInitialUrl({})).toBeNull();
+  });
+});
+
+describe('extractDeviceName', () => {
+  it('reads the name query parameter', () => {
+    expect(extractDeviceName(remoteUrl)).toBe('mrhuadeMacBook-Pro.local');
+  });
+
+  it('returns null when the name is missing, blank, or the URL is unsafe', () => {
+    expect(extractDeviceName('https://zcode.z.ai/remote/v4?sid=1')).toBeNull();
+    expect(extractDeviceName('https://zcode.z.ai/remote/v4?name=%20%20')).toBeNull();
+    expect(extractDeviceName('https://evil.example/remote/v4?name=Mac')).toBeNull();
   });
 });

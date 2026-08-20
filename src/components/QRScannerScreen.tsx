@@ -14,6 +14,7 @@ import {
 } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { resolveScannedRemoteConnection } from '../lib/remote-url';
+import { colors, type } from '../lib/theme';
 
 type QRScannerScreenProps = {
   visible: boolean;
@@ -69,7 +70,7 @@ export default function QRScannerScreen({
       <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.loading}>
-            <ActivityIndicator color="#8ab4ff" size="large" />
+            <ActivityIndicator color={colors.ultramarine} size="large" />
           </View>
         </SafeAreaView>
       </Modal>
@@ -81,6 +82,7 @@ export default function QRScannerScreen({
       <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
         <SafeAreaView style={styles.safeArea}>
           <View testID="camera-permission-denied" style={styles.permissionContainer}>
+            <Text style={styles.permissionEyebrow}>camera ▸ permission required</Text>
             <Text style={styles.title}>需要相机权限</Text>
             <Text style={styles.message}>
               ZCode Remote 使用相机扫描桌面端生成的连接二维码。你可以在系统设置中重新开启权限。
@@ -116,7 +118,7 @@ export default function QRScannerScreen({
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>扫码连接 ZCode</Text>
+            <Text style={styles.title}>扫码连接</Text>
             <Text style={styles.headerCaption}>对准桌面端连接二维码</Text>
           </View>
           <Pressable
@@ -136,10 +138,15 @@ export default function QRScannerScreen({
             onBarcodeScanned={handleBarcodeScanned}
             barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
           />
-          <View style={styles.scanFrame} pointerEvents="none" />
+          <View style={styles.scanFrame} pointerEvents="none">
+            <View style={[styles.corner, styles.cornerTopLeft]} />
+            <View style={[styles.corner, styles.cornerTopRight]} />
+            <View style={[styles.corner, styles.cornerBottomLeft]} />
+            <View style={[styles.corner, styles.cornerBottomRight]} />
+          </View>
           {connecting ? (
             <View style={styles.connectingOverlay}>
-              <ActivityIndicator color="#ffffff" size="large" />
+              <ActivityIndicator color={colors.ultramarine} size="large" />
               <Text style={styles.connectingText}>正在建立连接…</Text>
             </View>
           ) : null}
@@ -160,11 +167,12 @@ export default function QRScannerScreen({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#080B12', flex: 1 },
+  safeArea: { backgroundColor: colors.void, flex: 1 },
   loading: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   permissionContainer: { alignItems: 'center', flex: 1, gap: 14, justifyContent: 'center', padding: 28 },
-  title: { color: '#ffffff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
-  message: { color: '#a5adc8', fontSize: 15, lineHeight: 23, textAlign: 'center' },
+  permissionEyebrow: { ...type.monoEyebrow, color: colors.danger },
+  title: { ...type.title, color: colors.text },
+  message: { ...type.body, textAlign: 'center' },
   header: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -172,46 +180,55 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
   },
-  headerCaption: { color: '#98a2b8', fontSize: 13, marginTop: 3 },
+  headerCaption: { color: colors.faint, fontSize: 13, marginTop: 3 },
   closeButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 13,
+    backgroundColor: colors.panel,
+    borderColor: colors.hairline,
+    borderRadius: 999,
+    borderWidth: 1,
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
-  closeButtonText: { color: '#e7eaf3', fontSize: 14, fontWeight: '600' },
-  cameraContainer: { backgroundColor: '#000000', borderRadius: 22, flex: 1, margin: 18, overflow: 'hidden' },
+  closeButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  cameraContainer: { backgroundColor: '#000000', borderRadius: 20, flex: 1, margin: 18, overflow: 'hidden' },
   camera: { flex: 1 },
   scanFrame: {
     alignSelf: 'center',
-    borderColor: '#8ab4ff',
-    borderRadius: 26,
-    borderWidth: 3,
     height: 240,
     marginBottom: 'auto',
     marginTop: 'auto',
     width: 240,
   },
+  corner: {
+    borderColor: 'rgba(255,255,255,0.92)',
+    height: 34,
+    position: 'absolute',
+    width: 34,
+  },
+  cornerTopLeft: { borderLeftWidth: 3, borderStyle: 'solid', borderTopWidth: 3, borderTopLeftRadius: 8, left: 0, top: 0 },
+  cornerTopRight: { borderRightWidth: 3, borderStyle: 'solid', borderTopWidth: 3, borderTopRightRadius: 8, right: 0, top: 0 },
+  cornerBottomLeft: { borderBottomWidth: 3, borderLeftWidth: 3, borderStyle: 'solid', bottom: 0, borderBottomLeftRadius: 8, left: 0 },
+  cornerBottomRight: { borderBottomWidth: 3, borderRightWidth: 3, borderStyle: 'solid', borderBottomRightRadius: 8, bottom: 0, right: 0 },
   connectingOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(5,7,13,0.76)',
+    backgroundColor: 'rgba(5,7,13,0.82)',
     flex: 1,
     gap: 12,
     justifyContent: 'center',
   },
-  connectingText: { color: '#ffffff', fontSize: 16, fontWeight: '600' },
+  connectingText: { color: colors.text, fontSize: 16, fontWeight: '600' },
   footer: { minHeight: 72, paddingHorizontal: 20, paddingVertical: 14 },
-  footerText: { color: '#7d8aa5', fontSize: 13, lineHeight: 20 },
-  error: { color: '#ff9188', fontSize: 13, lineHeight: 20 },
+  footerText: { color: colors.faint, fontSize: 13, lineHeight: 20 },
+  error: { color: colors.danger, fontSize: 13, lineHeight: 20 },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#155ee3',
+    backgroundColor: colors.ultramarine,
     borderRadius: 14,
     paddingHorizontal: 28,
     paddingVertical: 13,
   },
-  primaryButtonText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  primaryButtonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
   secondaryButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.04)',
@@ -219,6 +236,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 26,
     paddingVertical: 12,
   },
-  secondaryButtonText: { color: '#cfd5e4', fontSize: 15, fontWeight: '600' },
-  pressed: { opacity: 0.76 },
+  secondaryButtonText: { color: colors.dim, fontSize: 15, fontWeight: '600' },
+  pressed: { opacity: colors.pressed },
 });

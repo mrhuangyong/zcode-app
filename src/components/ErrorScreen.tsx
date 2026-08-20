@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors, monoFont, type } from '../lib/theme';
 
 type ErrorScreenProps = {
   message: string;
@@ -11,67 +12,65 @@ export default function ErrorScreen({ message, onRetry, onSetup }: ErrorScreenPr
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <View style={styles.icon}>
-          <Text style={styles.iconText}>!</Text>
-        </View>
+        <Text style={styles.eyebrow}>remote ▸ unreachable</Text>
         <Text style={styles.title}>连接遇到问题</Text>
         <Text style={styles.message}>{message}</Text>
-        <Pressable
-          testID="retry-button"
-          accessibilityRole="button"
-          accessibilityLabel="重试连接"
-          onPress={onRetry}
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressedButton]}
-        >
-          <Text style={styles.primaryButtonText}>重试</Text>
-        </Pressable>
-        {onSetup ? (
+        <View style={styles.actions}>
           <Pressable
-            testID="reconfigure-button"
+            testID="retry-button"
             accessibilityRole="button"
-            accessibilityLabel="更换远控链接"
-            onPress={onSetup}
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressedButton]}
+            accessibilityLabel="重试连接"
+            onPress={onRetry}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressedButton]}
           >
-            <Text style={styles.secondaryButtonText}>更换远控链接</Text>
+            <Text style={styles.primaryButtonText}>重试</Text>
           </Pressable>
-        ) : null}
+          {onSetup ? (
+            <Pressable
+              testID="reconfigure-button"
+              accessibilityRole="button"
+              accessibilityLabel="更换远控链接"
+              onPress={onSetup}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressedButton]}
+            >
+              <Text style={styles.secondaryButtonText}>更换远控链接</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        <Text style={styles.hint}>桌面端离线或链接过期也会中断连接；重新扫码可获得新链接。</Text>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#080b12', flex: 1 },
-  container: { alignItems: 'center', flexGrow: 1, gap: 14, justifyContent: 'center', padding: 24 },
-  icon: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(217,45,32,0.14)',
-    borderColor: 'rgba(255,145,136,0.36)',
-    borderRadius: 24,
-    borderWidth: 1,
-    height: 68,
-    justifyContent: 'center',
-    width: 68,
+  safeArea: { backgroundColor: colors.void, flex: 1 },
+  container: { flex: 1, gap: 12, justifyContent: 'center', padding: 28 },
+  eyebrow: {
+    color: colors.danger,
+    fontFamily: monoFont,
+    fontSize: 12,
+    letterSpacing: 0.8,
   },
-  iconText: { color: '#ff9188', fontSize: 32, fontWeight: '800' },
-  title: { color: '#ffffff', fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  message: { color: '#a5adc8', fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  title: { ...type.display, fontSize: 28 },
+  message: { ...type.body, color: colors.dim },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#155ee3',
-    borderRadius: 15,
-    paddingHorizontal: 34,
-    paddingVertical: 14,
+    backgroundColor: colors.ultramarine,
+    borderRadius: 14,
+    paddingHorizontal: 30,
+    paddingVertical: 13,
   },
-  primaryButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
+  primaryButtonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
   secondaryButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 15,
-    paddingHorizontal: 28,
+    borderRadius: 14,
+    paddingHorizontal: 22,
     paddingVertical: 13,
   },
-  secondaryButtonText: { color: '#cfd5e4', fontSize: 15, fontWeight: '600' },
-  pressedButton: { opacity: 0.76 },
+  secondaryButtonText: { color: colors.dim, fontSize: 15, fontWeight: '600' },
+  hint: { color: colors.faint, fontSize: 12, lineHeight: 18, marginTop: 6 },
+  pressedButton: { opacity: colors.pressed },
 });

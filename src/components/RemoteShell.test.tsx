@@ -23,13 +23,24 @@ const safeAreaViewMock = SafeAreaView as unknown as jest.Mock;
 const remoteUrl =
   'https://zcode.z.ai/remote/v4?sid=session-id&hash=encoded%2Fvalue%3D&t=1&mid=mid&name=Mac.local&app_version=3.7.7';
 
+function renderShell(overrides: Partial<Parameters<typeof RemoteShell>[0]> = {}) {
+  return render(
+    <RemoteShell
+      remoteUrl={remoteUrl}
+      deviceName="Mac.local"
+      onExit={jest.fn()}
+      {...overrides}
+    />,
+  );
+}
+
 beforeEach(() => {
   webViewMock.mockClear();
 });
 
 describe('RemoteShell', () => {
   it('loads the official remote app with full browser capabilities', async () => {
-    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={jest.fn()} />);
+    await renderShell();
 
     const props = webViewMock.mock.calls[0][0];
     expect(props.source).toEqual({ uri: remoteUrl });
@@ -42,7 +53,7 @@ describe('RemoteShell', () => {
   });
 
   it('keeps WebView content below the system status bar', async () => {
-    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={jest.fn()} />);
+    await renderShell();
 
     expect(safeAreaViewMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -52,17 +63,23 @@ describe('RemoteShell', () => {
     );
   });
 
-  it('offers a scanner entry while connected', async () => {
-    const onScanRequest = jest.fn();
-    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={onScanRequest} />);
+  it('returns to the device list from the shell header', async () => {
+    const onExit = jest.fn();
+    await renderShell({ onExit });
 
-    await fireEvent.press(screen.getByTestId('open-scanner-button'));
+    await fireEvent.press(screen.getByTestId('back-to-devices'));
 
-    expect(onScanRequest).toHaveBeenCalledTimes(1);
+    expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the active device name in the header', async () => {
+    await renderShell({ deviceName: 'Studio Mac' });
+
+    expect(screen.getByText('Studio Mac')).toBeTruthy();
   });
 
   it('uses the navigation policy for WebView and external links', async () => {
-    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={jest.fn()} />);
+    await renderShell();
 
     const decide = webViewMock.mock.calls[0][0].onShouldStartLoadWithRequest;
 
@@ -75,7 +92,7 @@ describe('RemoteShell', () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await act(async () => {});
     openURL.mockClear();
-    await render(<RemoteShell remoteUrl={remoteUrl} onScanRequest={jest.fn()} />);
+    await renderShell();
 
     const props = webViewMock.mock.calls[0][0];
     const event = {

@@ -1,12 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RemoteShell from './src/components/RemoteShell';
 import QRScannerScreen from './src/components/QRScannerScreen';
-import SetupScreen from './src/components/SetupScreen';
-import { parseConnectDeepLink, resolveInitialUrl } from './src/lib/remote-url';
-import { clearRemoteUrl, loadRemoteUrl, saveRemoteUrl } from './src/lib/secure-remote-store';
+import DeviceListScreen from './src/components/DeviceListScreen';
+import { parseConnectDeepLink } from './src/lib/remote-url';
+import {
+  deleteDevice,
+  loadDevices,
+  renameDevice,
+  upsertDevice,
+  type RemoteDevice,
+} from './src/lib/secure-remote-store';
+import { colors, monoFont } from './src/lib/theme';
 
 const initialSafeAreaMetrics = {
   frame: { x: 0, y: 0, width: 0, height: 0 },
@@ -15,14 +22,19 @@ const initialSafeAreaMetrics = {
 
 export default function App() {
   const [ready, setReady] = useState(false);
-  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+  const [devices, setDevices] = useState<RemoteDevice[]>([]);
+  const [activeDevice, setActiveDevice] = useState<RemoteDevice | null>(null);
   const [webViewSession, setWebViewSession] = useState(0);
   const [scannerVisible, setScannerVisible] = useState(false);
 
   const connect = useCallback(async (url: string) => {
-    setRemoteUrl(url);
-    setWebViewSession((session) => session + 1);
-    await saveRemoteUrl(url);
+    const device = await upsertDevice(url);
+
+    if (device) {
+      setDevices(await loadDevices());
+      setActiveDevice(device);
+      setWebViewSession((session) => session + 1);
+    }
   }, []);
 
   const openScanner = useCallback(() => {
@@ -41,6 +53,23 @@ export default function App() {
     [connect],
   );
 
+  const handleRenameDevice = useCallback(async (id: string, name: string) => {
+    setDevices(await renameDevice(id, name));
+  }, []);
+
+  const handleDeleteDevice = useCallback(
+    async (id: string) => {
+      const next = await deleteDevice(id);
+      setDevices(next);
+      setActiveDevice((current) => (current?.id === id ? null : current));
+    },
+    [],
+  );
+
+  const exitToDevices = useCallback(() => {
+    setActiveDevice(null);
+  }, []);
+
   const handleUrlEvent = useCallback(
     (event: { url: string }) => {
       const target = parseConnectDeepLink(event.url);
@@ -56,24 +85,23 @@ export default function App() {
     let active = true;
 
     const bootstrap = async () => {
-      const [stored, initialLink] = await Promise.all([
-        loadRemoteUrl(),
+      const [storedDevices, initialLink] = await Promise.all([
+        loadDevices(),
         Linking.getInitialURL().catch(() => null),
       ]);
-      const linked = initialLink ? parseConnectDeepLink(initialLink) : null;
-
-      if (linked) {
-        void saveRemoteUrl(linked);
-      }
-
-      const initial = resolveInitialUrl({ stored: linked ?? stored });
 
       if (!active) {
         return;
       }
 
-      setRemoteUrl(initial);
+      setDevices(storedDevices);
       setReady(true);
+
+      const linked = initialLink ? parseConnectDeepLink(initialLink) : null;
+
+      if (linked) {
+        void connect(linked);
+      }
     };
 
     void bootstrap();
@@ -84,30 +112,33 @@ export default function App() {
       active = false;
       subscription.remove();
     };
-  }, [handleUrlEvent]);
-
-  const setup = useCallback(async () => {
-    await clearRemoteUrl();
-    setRemoteUrl(null);
-  }, []);
+  }, [connect, handleUrlEvent]);
 
   return (
     <SafeAreaProvider initialMetrics={initialSafeAreaMetrics}>
       <StatusBar style="light" />
       {ready ? (
-        remoteUrl ? (
+        activeDevice ? (
           <RemoteShell
             key={webViewSession}
-            remoteUrl={remoteUrl}
-            onScanRequest={openScanner}
-            onSetup={setup}
+            remoteUrl={activeDevice.url}
+            deviceName={activeDevice.name}
+            onExit={exitToDevices}
           />
         ) : (
-          <SetupScreen onConnect={connect} onScanRequest={openScanner} />
+          <DeviceListScreen
+            devices={devices}
+            activeDeviceId={null}
+            onConnect={connect}
+            onRenameDevice={handleRenameDevice}
+            onDeleteDevice={handleDeleteDevice}
+            onScanRequest={openScanner}
+          />
         )
       ) : (
         <View style={styles.boot}>
-          <ActivityIndicator color="#8ab4ff" size="large" />
+          <ActivityIndicator color={colors.ultramarine} size="large" />
+          <Text style={styles.bootText}>zcode ▸ linking</Text>
         </View>
       )}
       <QRScannerScreen
@@ -120,5 +151,6 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  boot: { alignItems: 'center', backgroundColor: '#080b12', flex: 1, justifyContent: 'center' },
+  boot: { alignItems: 'center', backgroundColor: colors.void, flex: 1, gap: 14, justifyContent: 'center' },
+  bootText: { color: colors.faint, fontFamily: monoFont, fontSize: 12, letterSpacing: 0.8 },
 });

@@ -13,15 +13,16 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 import { resolveNavigationTarget } from '../lib/navigation';
+import { colors } from '../lib/theme';
 import ErrorScreen from './ErrorScreen';
 
 type RemoteShellProps = {
   remoteUrl: string;
-  onScanRequest: () => void;
-  onSetup?: () => void;
+  deviceName: string;
+  onExit: () => void;
 };
 
-export default function RemoteShell({ remoteUrl, onScanRequest, onSetup }: RemoteShellProps) {
+export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShellProps) {
   useKeepAwake();
   const webViewRef = useRef<React.ComponentRef<typeof WebView>>(null);
   const [sourceUri, setSourceUri] = useState(remoteUrl);
@@ -72,16 +73,23 @@ export default function RemoteShell({ remoteUrl, onScanRequest, onSetup }: Remot
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.shellHeader}>
-        <Text style={styles.shellHeaderText}>ZCode Remote</Text>
         <Pressable
-          testID="open-scanner-button"
+          testID="back-to-devices"
           accessibilityRole="button"
-          accessibilityLabel="扫码连接新桌面"
-          onPress={onScanRequest}
-          style={({ pressed }) => [styles.scanButton, pressed && styles.pressedButton]}
+          accessibilityLabel="返回设备列表"
+          onPress={onExit}
+          style={({ pressed }) => [styles.exitButton, pressed && styles.pressedButton]}
         >
-          <Text style={styles.scanButtonText}>扫码</Text>
+          <Text style={styles.exitIcon}>‹</Text>
+          <Text style={styles.exitText}>设备</Text>
         </Pressable>
+        <View style={styles.headerIdentity}>
+          <View style={styles.linkDot} accessibilityLabel="远控链路已建立" />
+          <Text style={styles.shellHeaderText} numberOfLines={1}>
+            {deviceName}
+          </Text>
+        </View>
+        <View style={styles.headerSpacer} />
       </View>
       <WebView
         ref={webViewRef}
@@ -101,14 +109,14 @@ export default function RemoteShell({ remoteUrl, onScanRequest, onSetup }: Remot
         startInLoadingState
         renderLoading={() => (
           <View style={styles.loading}>
-            <ActivityIndicator color="#8ab4ff" size="large" />
+            <ActivityIndicator color={colors.ultramarine} size="large" />
           </View>
         )}
-        renderError={(code, description) => (
+        renderError={(code) => (
           <ErrorScreen
-            message={`无法加载 ZCode 远控页面（${code}）。请检查网络后重试。${description ? '' : ''}`}
+            message={`无法加载 ZCode 远控页面（${code}）。请检查网络后重试。`}
             onRetry={() => webViewRef.current?.reload()}
-            onSetup={onSetup}
+            onSetup={onExit}
           />
         )}
         onShouldStartLoadWithRequest={shouldStartLoad}
@@ -143,11 +151,11 @@ export default function RemoteShell({ remoteUrl, onScanRequest, onSetup }: Remot
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: '#080b12', flex: 1 },
+  container: { backgroundColor: colors.void, flex: 1 },
   shellHeader: {
     alignItems: 'center',
-    backgroundColor: '#0B0F18',
-    borderColor: 'rgba(96,112,150,0.24)',
+    backgroundColor: colors.panel,
+    borderColor: colors.hairline,
     borderBottomWidth: 1,
     flexDirection: 'row',
     gap: 12,
@@ -155,16 +163,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
   },
-  shellHeaderText: { color: '#e7eaf3', fontSize: 15, fontWeight: '700' },
-  scanButton: {
+  headerIdentity: { alignItems: 'center', flexDirection: 'row', flex: 1, gap: 8, justifyContent: 'center' },
+  exitButton: {
     alignItems: 'center',
-    backgroundColor: '#155ee3',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    backgroundColor: colors.panelDeep,
+    borderColor: colors.hairline,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 3,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  scanButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
-  pressedButton: { opacity: 0.76 },
-  webView: { backgroundColor: '#080b12', flex: 1 },
-  loading: { alignItems: 'center', backgroundColor: '#080b12', flex: 1, justifyContent: 'center' },
+  exitIcon: { color: '#9DB8FF', fontSize: 17, lineHeight: 20, marginTop: -1 },
+  exitText: { color: '#9DB8FF', fontSize: 13, fontWeight: '700' },
+  headerSpacer: { paddingHorizontal: 26 },
+  linkDot: {
+    backgroundColor: colors.signal,
+    borderRadius: 4,
+    height: 7,
+    width: 7,
+  },
+  shellHeaderText: { color: colors.text, flexShrink: 1, fontSize: 15, fontWeight: '700' },
+  pressedButton: { opacity: colors.pressed },
+  webView: { backgroundColor: colors.void, flex: 1 },
+  loading: { alignItems: 'center', backgroundColor: colors.void, flex: 1, justifyContent: 'center' },
 });

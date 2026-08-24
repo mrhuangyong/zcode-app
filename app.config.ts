@@ -1,9 +1,10 @@
 import type { ExpoConfig } from 'expo/config';
+import versionInfo from './version.json';
 
 const config: ExpoConfig = {
   name: 'ZCode Remote',
   slug: 'zcode-remote',
-  version: '1.0.0',
+  version: versionInfo.version,
   orientation: 'default',
   icon: './assets/icon.png',
   scheme: 'zcode-mobile',
@@ -12,7 +13,7 @@ const config: ExpoConfig = {
   assetBundlePatterns: ['**/*'],
   ios: {
     bundleIdentifier: 'ai.zcode.remote',
-    buildNumber: '1',
+    buildNumber: String(versionInfo.iosBuildNumber),
     supportsTablet: true,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -30,7 +31,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'ai.zcode.remote',
-    versionCode: 1,
+    versionCode: versionInfo.androidVersionCode,
     allowBackup: false,
     permissions: ['CAMERA', 'RECORD_AUDIO', 'VIBRATE'],
     softwareKeyboardLayoutMode: 'resize',
@@ -73,6 +74,7 @@ const config: ExpoConfig = {
   },
   extra: {
     project: 'zcode-mobile-remote',
+    githubRepo: 'mrhuangyong/zcode-app',
   },
 };
 

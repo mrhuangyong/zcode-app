@@ -1,0 +1,81 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+# bump 提交带 [skip ci]，由 GitHub 原生跳过，不会形成循环。
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      REPO: mrhuangyong/zcode-app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bump version
+        id: bump
+        run: |
+          VERSION=$(node scripts/bump-version.mjs)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          git commit -m "chore(release): v$VERSION [skip ci]"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/$REPO.git" HEAD:main
+          git tag "v$VERSION"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/$REPO.git" "v$VERSION"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Prebuild android
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Inject release signing
+        run: node scripts/inject-android-signing.mjs
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Build release APK
+        run: cd android && ./gradlew assembleRelease -x lint --no-daemon
+
+      - name: Create GitHub release with APK asset
+        run: |
+          VERSION=${{ steps.bump.outputs.version }}
+          cp android/app/build/outputs/apk/release/app-release.apk "zcode-remote-v$VERSION.apk"
+          RELEASE_ID=$(curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/releases" \
+            -d "{\"tag_name\":\"v$VERSION\",\"name\":\"v$VERSION\",\"body\":\"自动发布：ZCode Remote v$VERSION\"}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).id))")
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary "@zcode-remote-v$VERSION.apk" \
+            "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=zcode-remote-v$VERSION.apk"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

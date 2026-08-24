@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 import DeviceListScreen from './DeviceListScreen';
 import type { RemoteDevice } from '../lib/secure-remote-store';
 
@@ -28,6 +29,8 @@ async function renderScreen(devices: RemoteDevice[] = [makeDevice()]) {
     <DeviceListScreen
       devices={devices}
       activeDeviceId={null}
+      update={null}
+      onUpdateDismissed={jest.fn()}
       onConnect={jest.fn()}
       onRenameDevice={jest.fn()}
       onDeleteDevice={jest.fn()}
@@ -59,6 +62,8 @@ describe('DeviceListScreen', () => {
       <DeviceListScreen
         devices={[device]}
         activeDeviceId={null}
+        update={null}
+        onUpdateDismissed={jest.fn()}
         onConnect={onConnect}
         onRenameDevice={jest.fn()}
         onDeleteDevice={jest.fn()}
@@ -84,6 +89,8 @@ describe('DeviceListScreen', () => {
       <DeviceListScreen
         devices={[device]}
         activeDeviceId={null}
+        update={null}
+        onUpdateDismissed={jest.fn()}
         onConnect={jest.fn()}
         onRenameDevice={onRenameDevice}
         onDeleteDevice={jest.fn()}
@@ -118,6 +125,8 @@ describe('DeviceListScreen', () => {
       <DeviceListScreen
         devices={[device]}
         activeDeviceId={null}
+        update={null}
+        onUpdateDismissed={jest.fn()}
         onConnect={jest.fn()}
         onRenameDevice={jest.fn()}
         onDeleteDevice={onDeleteDevice}
@@ -149,6 +158,8 @@ describe('DeviceListScreen', () => {
       <DeviceListScreen
         devices={[device]}
         activeDeviceId={null}
+        update={null}
+        onUpdateDismissed={jest.fn()}
         onConnect={jest.fn()}
         onRenameDevice={jest.fn()}
         onDeleteDevice={onDeleteDevice}
@@ -179,6 +190,8 @@ describe('DeviceListScreen', () => {
       <DeviceListScreen
         devices={[]}
         activeDeviceId={null}
+        update={null}
+        onUpdateDismissed={jest.fn()}
         onConnect={onConnect}
         onRenameDevice={jest.fn()}
         onDeleteDevice={jest.fn()}
@@ -207,6 +220,8 @@ describe('DeviceListScreen', () => {
       <DeviceListScreen
         devices={[]}
         activeDeviceId={null}
+        update={null}
+        onUpdateDismissed={jest.fn()}
         onConnect={onConnect}
         onRenameDevice={jest.fn()}
         onDeleteDevice={jest.fn()}
@@ -228,12 +243,82 @@ describe('DeviceListScreen', () => {
     expect(onConnect).toHaveBeenCalledWith(remoteUrl);
   });
 
+  it('renders the update banner and opens the download link', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await render(
+      <DeviceListScreen
+        devices={[]}
+        activeDeviceId={null}
+        update={{
+          available: true,
+          currentVersion: '1.0.0',
+          release: {
+            version: '1.0.1',
+            apkUrl: 'https://github.com/mrhuangyong/zcode-app/releases/download/v1.0.1/zcode-remote-v1.0.1.apk',
+            notes: '',
+          },
+        }}
+        onUpdateDismissed={jest.fn()}
+        onConnect={jest.fn()}
+        onRenameDevice={jest.fn()}
+        onDeleteDevice={jest.fn()}
+        onScanRequest={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('update-banner')).toBeTruthy();
+    expect(screen.getByText(/发现新版本 v1\.0\.1/)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('update-download-button'));
+    });
+
+    expect(openURL).toHaveBeenCalledWith(
+      'https://github.com/mrhuangyong/zcode-app/releases/download/v1.0.1/zcode-remote-v1.0.1.apk',
+    );
+    openURL.mockRestore();
+  });
+
+  it('dismisses the update banner until the next launch', async () => {
+    const onUpdateDismissed = jest.fn();
+    await render(
+      <DeviceListScreen
+        devices={[]}
+        activeDeviceId={null}
+        update={{
+          available: true,
+          currentVersion: '1.0.0',
+          release: { version: '1.0.1', apkUrl: 'https://example.com/a.apk', notes: '' },
+        }}
+        onUpdateDismissed={onUpdateDismissed}
+        onConnect={jest.fn()}
+        onRenameDevice={jest.fn()}
+        onDeleteDevice={jest.fn()}
+        onScanRequest={jest.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('update-dismiss-button'));
+    });
+
+    expect(onUpdateDismissed).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no update banner when the check reports nothing new', async () => {
+    await renderScreen();
+
+    expect(screen.queryByTestId('update-banner')).toBeNull();
+  });
+
   it('opens the scanner from the add card', async () => {
     const onScanRequest = jest.fn();
     await render(
       <DeviceListScreen
         devices={[]}
         activeDeviceId={null}
+        update={null}
+        onUpdateDismissed={jest.fn()}
         onConnect={jest.fn()}
         onRenameDevice={jest.fn()}
         onDeleteDevice={jest.fn()}

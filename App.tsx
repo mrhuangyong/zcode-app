@@ -14,6 +14,7 @@ import {
   type RemoteDevice,
 } from './src/lib/secure-remote-store';
 import { colors, monoFont } from './src/lib/theme';
+import { checkForUpdate, type UpdateCheckResult } from './src/lib/updater';
 
 const initialSafeAreaMetrics = {
   frame: { x: 0, y: 0, width: 0, height: 0 },
@@ -26,6 +27,22 @@ export default function App() {
   const [activeDevice, setActiveDevice] = useState<RemoteDevice | null>(null);
   const [webViewSession, setWebViewSession] = useState(0);
   const [scannerVisible, setScannerVisible] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    void checkForUpdate().then((result) => {
+      // 静默检查：网络失败或无更新都不打扰用户。
+      if (active && result?.available) {
+        setUpdateInfo(result);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const connect = useCallback(async (url: string) => {
     const device = await upsertDevice(url);
@@ -129,6 +146,8 @@ export default function App() {
           <DeviceListScreen
             devices={devices}
             activeDeviceId={null}
+            update={updateInfo}
+            onUpdateDismissed={() => setUpdateInfo(null)}
             onConnect={connect}
             onRenameDevice={handleRenameDevice}
             onDeleteDevice={handleDeleteDevice}

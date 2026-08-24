@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -12,10 +13,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { normalizeRemoteUrl, redactRemoteUrl } from '../lib/remote-url';
 import type { RemoteDevice } from '../lib/secure-remote-store';
 import { colors, monoFont, type } from '../lib/theme';
+import type { UpdateCheckResult } from '../lib/updater';
 
 type DeviceListScreenProps = {
   devices: RemoteDevice[];
   activeDeviceId: string | null;
+  update: UpdateCheckResult | null;
+  onUpdateDismissed: () => void;
   onConnect: (url: string) => void | Promise<void>;
   onRenameDevice: (id: string, name: string) => void | Promise<void>;
   onDeleteDevice: (id: string) => void | Promise<void>;
@@ -34,6 +38,8 @@ function formatLastConnected(timestamp: number): string {
 export default function DeviceListScreen({
   devices,
   activeDeviceId,
+  update,
+  onUpdateDismissed,
   onConnect,
   onRenameDevice,
   onDeleteDevice,
@@ -94,6 +100,38 @@ export default function DeviceListScreen({
         <Text style={styles.subtitle}>
           扫码或粘贴远控链接添加桌面端设备，点击设备即可继续远控会话。
         </Text>
+
+        {update?.available ? (
+          <View testID="update-banner" style={styles.updateCard}>
+            <Text style={styles.updateEyebrow}>update ▸ available</Text>
+            <View style={styles.updateRow}>
+              <View style={styles.updateMain}>
+                <Text style={styles.updateText}>
+                  发现新版本 v{update.release.version}（当前 v{update.currentVersion}）
+                </Text>
+              </View>
+              <Pressable
+                testID="update-download-button"
+                accessibilityRole="button"
+                accessibilityLabel={`下载新版本 v${update.release.version}`}
+                onPress={() => void Linking.openURL(update.release.apkUrl)}
+                style={({ pressed }) => [styles.updateButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.updateButtonText}>下载</Text>
+              </Pressable>
+              <Pressable
+                testID="update-dismiss-button"
+                accessibilityRole="button"
+                accessibilityLabel="忽略本次更新提示"
+                onPress={onUpdateDismissed}
+                style={({ pressed }) => [styles.updateDismiss, pressed && styles.pressed]}
+                hitSlop={8}
+              >
+                <Text style={styles.updateDismissText}>✕</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         {devices.length === 0 ? (
           <View style={styles.emptyCard}>
@@ -364,6 +402,34 @@ const styles = StyleSheet.create({
   eyebrow: { ...type.monoEyebrow, color: colors.ultramarine },
   title: { ...type.display, marginTop: 0 },
   subtitle: { ...type.body, marginBottom: 8 },
+  updateCard: {
+    backgroundColor: colors.panel,
+    borderColor: 'rgba(61,110,255,0.45)',
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 8,
+    marginBottom: 4,
+    padding: 14,
+  },
+  updateEyebrow: { ...type.monoEyebrow, color: '#9DB8FF' },
+  updateRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  updateMain: { flex: 1 },
+  updateText: { color: colors.text, fontSize: 14 },
+  updateButton: {
+    alignItems: 'center',
+    backgroundColor: colors.ultramarine,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  updateButtonText: { color: colors.onAccent, fontSize: 13, fontWeight: '700' },
+  updateDismiss: {
+    alignItems: 'center',
+    height: 34,
+    justifyContent: 'center',
+    width: 30,
+  },
+  updateDismissText: { color: colors.faint, fontSize: 15 },
   emptyCard: {
     backgroundColor: colors.panel,
     borderColor: colors.hairline,

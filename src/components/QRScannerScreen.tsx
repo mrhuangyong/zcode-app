@@ -12,7 +12,9 @@ import {
   useCameraPermissions,
   type BarcodeScanningResult,
 } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { decodeQrFromImage } from '../lib/qr-image';
 import { resolveScannedRemoteConnection } from '../lib/remote-url';
 import { colors, type } from '../lib/theme';
 
@@ -30,10 +32,11 @@ export default function QRScannerScreen({
   const [permission, requestPermission] = useCameraPermissions();
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [decoding, setDecoding] = useState(false);
   const handledPayloadRef = useRef<string | null>(null);
 
-  const handleBarcodeScanned = useCallback(
-    ({ data }: BarcodeScanningResult) => {
+  const handlePayload = useCallback(
+    (data: string) => {
       if (handledPayloadRef.current === data || connecting) {
         return;
       }
@@ -60,6 +63,47 @@ export default function QRScannerScreen({
     },
     [connecting, onConnect],
   );
+
+  const handleBarcodeScanned = useCallback(
+    ({ data }: BarcodeScanningResult) => handlePayload(data),
+    [handlePayload],
+  );
+
+  const pickFromGallery = useCallback(() => {
+    if (connecting || decoding) {
+      return;
+    }
+
+    setError(null);
+
+    void (async () => {
+      try {
+        const picked = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsMultipleSelection: false,
+          quality: 1,
+        });
+
+        if (picked.canceled || picked.assets.length === 0) {
+          return;
+        }
+
+        setDecoding(true);
+        const decoded = await decodeQrFromImage(picked.assets[0].uri);
+
+        if (decoded === null) {
+          setError('未能从所选图片中识别出二维码，请确认图片清晰完整。');
+          return;
+        }
+
+        handlePayload(decoded);
+      } catch {
+        setError('读取图片失败，请重试。');
+      } finally {
+        setDecoding(false);
+      }
+    })();
+  }, [connecting, decoding, handlePayload]);
 
   if (!visible) {
     return null;
@@ -138,18 +182,38 @@ export default function QRScannerScreen({
             onBarcodeScanned={handleBarcodeScanned}
             barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
           />
-          <View style={styles.scanFrame} pointerEvents="none">
+          <View testID="scan-frame" style={styles.scanFrame} pointerEvents="none">
             <View style={[styles.corner, styles.cornerTopLeft]} />
             <View style={[styles.corner, styles.cornerTopRight]} />
             <View style={[styles.corner, styles.cornerBottomLeft]} />
             <View style={[styles.corner, styles.cornerBottomRight]} />
           </View>
-          {connecting ? (
+          {connecting || decoding ? (
             <View style={styles.connectingOverlay}>
               <ActivityIndicator color={colors.ultramarine} size="large" />
-              <Text style={styles.connectingText}>正在建立连接…</Text>
+              <Text style={styles.connectingText}>
+                {connecting ? '正在建立连接…' : '正在识别二维码…'}
+              </Text>
             </View>
           ) : null}
+        </View>
+
+        <View style={styles.alignArea}>
+          <Text style={styles.alignCaption}>将二维码对准取景框</Text>
+          <Pressable
+            testID="pick-from-gallery-button"
+            accessibilityRole="button"
+            accessibilityLabel="从相册选择二维码图片"
+            onPress={pickFromGallery}
+            disabled={decoding}
+            style={({ pressed }) => [styles.galleryButton, pressed && styles.pressed]}
+          >
+            {decoding ? (
+              <ActivityIndicator color="#9DB8FF" size="small" />
+            ) : (
+              <Text style={styles.galleryButtonText}>从相册选择二维码</Text>
+            )}
+          </Pressable>
         </View>
 
         <View style={styles.footer}>
@@ -191,13 +255,38 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   closeButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  cameraContainer: { backgroundColor: '#000000', borderRadius: 20, flex: 1, margin: 18, overflow: 'hidden' },
+  cameraContainer: {
+    backgroundColor: '#000000',
+    borderRadius: 20,
+    height: '52%',
+    margin: 18,
+    marginBottom: 0,
+    overflow: 'hidden',
+  },
   camera: { flex: 1 },
+  connectingOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(5,7,13,0.82)',
+    flex: 1,
+    gap: 12,
+    justifyContent: 'center',
+  },
+  connectingText: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  alignArea: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  alignCaption: { color: colors.dim, fontSize: 14 },
   scanFrame: {
-    alignSelf: 'center',
     height: 240,
-    marginBottom: 'auto',
-    marginTop: 'auto',
+    left: '50%',
+    marginLeft: -120,
+    marginTop: -120,
+    position: 'absolute',
+    top: '50%',
     width: 240,
   },
   corner: {
@@ -208,16 +297,19 @@ const styles = StyleSheet.create({
   },
   cornerTopLeft: { borderLeftWidth: 3, borderStyle: 'solid', borderTopWidth: 3, borderTopLeftRadius: 8, left: 0, top: 0 },
   cornerTopRight: { borderRightWidth: 3, borderStyle: 'solid', borderTopWidth: 3, borderTopRightRadius: 8, right: 0, top: 0 },
-  cornerBottomLeft: { borderBottomWidth: 3, borderLeftWidth: 3, borderStyle: 'solid', bottom: 0, borderBottomLeftRadius: 8, left: 0 },
+  cornerBottomLeft: { borderBottomWidth: 3, borderLeftWidth: 3, borderStyle: 'solid', borderBottomLeftRadius: 8, bottom: 0, left: 0 },
   cornerBottomRight: { borderBottomWidth: 3, borderRightWidth: 3, borderStyle: 'solid', borderBottomRightRadius: 8, bottom: 0, right: 0 },
-  connectingOverlay: {
+  galleryButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(5,7,13,0.82)',
-    flex: 1,
-    gap: 12,
-    justifyContent: 'center',
+    backgroundColor: colors.ultramarineSoft,
+    borderColor: 'rgba(61,110,255,0.45)',
+    borderRadius: 999,
+    borderWidth: 1,
+    minHeight: 44,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
   },
-  connectingText: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  galleryButtonText: { color: '#9DB8FF', fontSize: 14, fontWeight: '700' },
   footer: { minHeight: 72, paddingHorizontal: 20, paddingVertical: 14 },
   footerText: { color: colors.faint, fontSize: 13, lineHeight: 20 },
   error: { color: colors.danger, fontSize: 13, lineHeight: 20 },

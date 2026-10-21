@@ -1,6 +1,19 @@
-import { resolveNavigationTarget } from './navigation';
+import { resolveIntentTargetUrl, resolveNavigationTarget } from './navigation';
 
 describe('navigation target policy', () => {
+  it('classifies intent:// escape links by their inner https target', () => {
+    const intent =
+      'intent://chat.z.ai/auth?response_type=code&client_id=c1#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=https%3A%2F%2Fchat.z.ai%2Fauth;end';
+
+    expect(resolveNavigationTarget(intent)).toBe('auth');
+    expect(resolveIntentTargetUrl(intent)).toBe('https://chat.z.ai/auth?response_type=code&client_id=c1');
+
+    const evilIntent =
+      'intent://evil.example/login#Intent;scheme=https;package=com.android.chrome;end';
+    expect(resolveNavigationTarget(evilIntent)).toBe('system');
+    expect(resolveNavigationTarget('intent://bigmodel.cn/login#Intent;scheme=https;end')).toBe('auth');
+    expect(resolveNavigationTarget('intent:unknown')).toBe('blocked');
+  });
   it('keeps official ZCode documents and browser-internal documents in WebView', () => {
     expect(resolveNavigationTarget('https://zcode.z.ai/remote/v4?sid=1')).toBe('webview');
     expect(resolveNavigationTarget('about:blank')).toBe('webview');

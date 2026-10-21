@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
-import { AUTH_ROOTS, resolveNavigationTarget } from '../lib/navigation';
+import { AUTH_ROOTS, resolveIntentTargetUrl, resolveNavigationTarget } from '../lib/navigation';
 import { colors } from '../lib/theme';
 
 type AuthBrowserModalProps = {
@@ -69,6 +69,20 @@ export default function AuthBrowserModal({ visible, initialUrl, onClose }: AuthB
   }, []);
 
   const shouldStartLoad = useCallback((request: Pick<WebViewNavigation, 'url'>) => {
+    // intent:// 一律接管：放行会被 Chromium 解析成外部 intent 直接拉起浏览器。
+    if (request.url.startsWith('intent:')) {
+      const target = resolveNavigationTarget(request.url);
+      const resolved = resolveIntentTargetUrl(request.url);
+
+      if ((target === 'auth' || target === 'webview') && resolved) {
+        setSourceUri(resolved);
+      } else if (target === 'system' && resolved) {
+        void openExternal(resolved);
+      }
+
+      return true;
+    }
+
     const target = resolveNavigationTarget(request.url);
 
     if (target === 'webview' || target === 'auth') {
@@ -82,6 +96,17 @@ export default function AuthBrowserModal({ visible, initialUrl, onClose }: AuthB
     return false;
   }, [openExternal]);
 
+  const handleOpenWindow = useCallback((event: { nativeEvent: { targetUrl: string } }) => {
+    const url = event.nativeEvent.targetUrl;
+    const target = resolveNavigationTarget(url);
+
+    if (target === 'auth' || target === 'webview') {
+      setSourceUri(resolveIntentTargetUrl(url) ?? url);
+    } else if (target === 'system') {
+      void openExternal(url);
+    }
+  }, [openExternal]);
+
   const handleNavigationStateChange = useCallback((event: { url: string }) => {
     try {
       const { hostname } = new URL(event.url);
@@ -93,20 +118,6 @@ export default function AuthBrowserModal({ visible, initialUrl, onClose }: AuthB
       // ignore malformed navigation URLs
     }
   }, []);
-
-  const handleOpenWindow = useCallback(
-    (event: { nativeEvent: { targetUrl: string } }) => {
-      const url = event.nativeEvent.targetUrl;
-      const target = resolveNavigationTarget(url);
-
-      if (target === 'auth' || target === 'webview') {
-        setSourceUri(url);
-      } else if (target === 'system') {
-        void openExternal(url);
-      }
-    },
-    [openExternal],
-  );
 
   if (!initialUrl) {
     return null;

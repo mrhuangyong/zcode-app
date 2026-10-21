@@ -12,7 +12,7 @@ import {
 import { useKeepAwake } from 'expo-keep-awake';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
-import { resolveNavigationTarget } from '../lib/navigation';
+import { resolveIntentTargetUrl, resolveNavigationTarget } from '../lib/navigation';
 import { colors, type } from '../lib/theme';
 import AuthBrowserModal from './AuthBrowserModal';
 import ErrorScreen from './ErrorScreen';
@@ -51,6 +51,20 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
     (request: Pick<WebViewNavigation, 'url'>) => {
       const target = resolveNavigationTarget(request.url);
 
+      // intent:// 链接必须始终由我们接管（返回 true 阻断）：放行给 Chromium 的默认
+      // 处理会解析 package=com.android.chrome 直接拉起系统浏览器。
+      if (request.url.startsWith('intent:')) {
+        const resolved = resolveIntentTargetUrl(request.url);
+
+        if (target === 'auth' && resolved) {
+          openAuthBrowser(resolved);
+        } else if (target === 'system' && resolved) {
+          void openExternal(resolved);
+        }
+
+        return true;
+      }
+
       if (target === 'webview') {
         return true;
       }
@@ -75,7 +89,7 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
       const target = resolveNavigationTarget(url);
 
       if (target === 'auth') {
-        openAuthBrowser(url);
+        openAuthBrowser(resolveIntentTargetUrl(url) ?? url);
       } else if (target === 'system') {
         void openExternal(url);
       } else if (url.startsWith('https://zcode.z.ai/')) {
@@ -86,9 +100,9 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
     [openAuthBrowser, openExternal],
   );
 
-  // 登录页会把自己的 OAuth 授权页强行送到系统浏览器（intent 逃逸，WebView 层无法拦截）。
-  // 好消息是远控页的登录采用 OAuth 轮询设计：只要在浏览器里用与桌面端相同的账号完成登录，
-  // 本应用内的轮询会自动接续会话。这里通过页面标题识别登录页，给出回流提示。
+  // 登录页会把 OAuth 授权链接包成 intent:// 强行送系统浏览器（navigation.ts 会解析拦截）。
+  // 若用户仍去了浏览器：远控页是 OAuth 轮询设计，浏览器完成登录后回到本应用，
+  // 轮询会自动接续会话。通过页面标题识别登录页，给出回流提示。
   const handleNavigationStateChange = useCallback((event: WebViewNavigation & { title?: string }) => {
     setCanGoBack(event.canGoBack);
     setShowLoginHint(typeof event.title === 'string' && event.title.includes('Sign In'));
@@ -135,7 +149,7 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
       {showLoginHint ? (
         <View testID="login-hint-banner" style={styles.loginHint}>
           <Text style={styles.loginHintText} numberOfLines={2}>
-            将在系统浏览器完成登录，请使用与电脑端相同的账号；完成后回到本应用，会话会自动继续。
+            请在系统浏览器用与电脑端相同的账号登录（尽量在 2 分钟内完成），完成后立即返回本应用，会话会自动接续。
           </Text>
         </View>
       ) : null}

@@ -13,11 +13,32 @@ export function isAuthHost(hostname: string): boolean {
   return AUTH_ROOTS.some((root) => hostname === root || hostname.endsWith(`.${root}`));
 }
 
-export function resolveNavigationTarget(rawUrl: string): NavigationTarget {
-  if (WEBVIEW_INTERNAL_SCHEMES.has(rawUrl.slice(0, rawUrl.indexOf(':') + 1))) {
-    return 'webview';
+// 解析 Android intent:// URL 的内层 https 地址：
+// intent://chat.z.ai/auth?x=1#Intent;scheme=https;package=com.android.chrome;end
+// 远控页登录会用这种链接把授权页强行送进 Chrome（绕开 WebView 上下文，导致 OAuth CSRF 失败）。
+// 识别后按内层地址分类，让授权页留在应用内。
+export function resolveIntentTargetUrl(rawUrl: string): string | null {
+  if (!rawUrl.startsWith('intent:')) {
+    return null;
   }
 
+  const hashIndex = rawUrl.indexOf('#Intent;');
+  if (hashIndex === -1) {
+    return null;
+  }
+
+  const body = rawUrl.slice('intent:'.length, hashIndex).replace(/^\/+/, '');
+  const params = new URLSearchParams(rawUrl.slice(hashIndex + '#Intent;'.length).replace(/;/g, '&'));
+  const scheme = params.get('scheme');
+
+  if (!scheme) {
+    return null;
+  }
+
+  return scheme.endsWith(':') ? `${scheme}//${body}` : `${scheme}://${body}`;
+}
+
+function classify(rawUrl: string): NavigationTarget {
   try {
     const url = new URL(rawUrl);
 
@@ -33,4 +54,16 @@ export function resolveNavigationTarget(rawUrl: string): NavigationTarget {
   } catch {
     return 'blocked';
   }
+}
+
+export function resolveNavigationTarget(rawUrl: string): NavigationTarget {
+  if (WEBVIEW_INTERNAL_SCHEMES.has(rawUrl.slice(0, rawUrl.indexOf(':') + 1))) {
+    return 'webview';
+  }
+
+  if (rawUrl.startsWith('intent:')) {
+    return classify(resolveIntentTargetUrl(rawUrl) ?? '');
+  }
+
+  return classify(rawUrl);
 }

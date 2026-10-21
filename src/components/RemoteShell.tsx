@@ -55,13 +55,18 @@ const BROWSER_SHIM = `
       var provider = pending.provider === 'bigmodel'
         ? 'https://bigmodel.cn/login'
         : 'https://chat.z.ai/api/oauth/authorize';
-      var query = new URLSearchParams({
-        redirect_uri: pending.redirectUri || window.location.href,
-        response_type: 'code',
-        client_id: CLIENT_ID,
-        state: state,
-      });
-      if (pending.provider === 'bigmodel') query.set('appId', 'zcode');
+      var query = pending.provider === 'bigmodel'
+        ? new URLSearchParams({
+            redirect: pending.redirectUri || window.location.href,
+            appId: 'zcode',
+            state: state,
+          })
+        : new URLSearchParams({
+            redirect_uri: pending.redirectUri || window.location.href,
+            response_type: 'code',
+            client_id: CLIENT_ID,
+            state: state,
+          });
       var authorizeUrl = provider + '?' + query.toString();
       if (window.ReactNativeWebView) {
         window.ReactNativeWebView.postMessage('AUTHORIZE::' + authorizeUrl);
@@ -84,6 +89,8 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
   const [canGoBack, setCanGoBack] = useState(false);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [showLoginHint, setShowLoginHint] = useState(false);
+  // 供 onMessage 回调读取最新值（避免闭包过期）。
+  const showLoginHintRef = useRef(false);
 
   const openExternal = useCallback(async (url: string) => {
     try {
@@ -161,7 +168,9 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
   // 轮询会自动接续会话。通过页面标题识别登录页，给出回流提示。
   const handleNavigationStateChange = useCallback((event: WebViewNavigation & { title?: string }) => {
     setCanGoBack(event.canGoBack);
-    setShowLoginHint(typeof event.title === 'string' && event.title.includes('Sign In'));
+    const onSignIn = typeof event.title === 'string' && event.title.includes('Sign In');
+    showLoginHintRef.current = onSignIn;
+    setShowLoginHint(onSignIn);
   }, []);
 
   useEffect(() => {
@@ -241,7 +250,8 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
         injectedJavaScriptBeforeContentLoaded={BROWSER_SHIM}
         onMessage={(event) => {
           const data = event.nativeEvent.data;
-          if (data.startsWith('AUTHORIZE::')) {
+          // 仅在登录页接管：避免旧的待登录请求在正常远控时反复弹窗。
+          if (data.startsWith('AUTHORIZE::') && showLoginHintRef.current) {
             openAuthBrowser(data.slice('AUTHORIZE::'.length));
           }
         }}

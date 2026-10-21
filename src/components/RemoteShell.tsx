@@ -13,7 +13,8 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 import { resolveNavigationTarget } from '../lib/navigation';
-import { colors } from '../lib/theme';
+import { colors, type } from '../lib/theme';
+import AuthBrowserModal from './AuthBrowserModal';
 import ErrorScreen from './ErrorScreen';
 
 type RemoteShellProps = {
@@ -27,6 +28,8 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
   const webViewRef = useRef<React.ComponentRef<typeof WebView>>(null);
   const [sourceUri, setSourceUri] = useState(remoteUrl);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [showLoginHint, setShowLoginHint] = useState(false);
 
   const openExternal = useCallback(async (url: string) => {
     try {
@@ -34,6 +37,14 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
     } catch {
       // Some pages advertise schemes the device cannot open. The remote session stays alive.
     }
+  }, []);
+
+  const openAuthBrowser = useCallback((url: string) => {
+    setAuthUrl((current) => current ?? url);
+  }, []);
+
+  const closeAuthBrowser = useCallback(() => {
+    setAuthUrl(null);
   }, []);
 
   const shouldStartLoad = useCallback(
@@ -44,14 +55,44 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
         return true;
       }
 
+      if (target === 'auth') {
+        openAuthBrowser(request.url);
+        return false;
+      }
+
       if (target === 'system') {
         void openExternal(request.url);
       }
 
       return false;
     },
-    [openExternal],
+    [openAuthBrowser, openExternal],
   );
+
+  const handleOpenWindow = useCallback(
+    (event: { nativeEvent: { targetUrl: string } }) => {
+      const url = event.nativeEvent.targetUrl;
+      const target = resolveNavigationTarget(url);
+
+      if (target === 'auth') {
+        openAuthBrowser(url);
+      } else if (target === 'system') {
+        void openExternal(url);
+      } else if (url.startsWith('https://zcode.z.ai/')) {
+        setSourceUri(url);
+      }
+      // 其余（about:blank 等）忽略。
+    },
+    [openAuthBrowser, openExternal],
+  );
+
+  // 登录页会把自己的 OAuth 授权页强行送到系统浏览器（intent 逃逸，WebView 层无法拦截）。
+  // 好消息是远控页的登录采用 OAuth 轮询设计：只要在浏览器里用与桌面端相同的账号完成登录，
+  // 本应用内的轮询会自动接续会话。这里通过页面标题识别登录页，给出回流提示。
+  const handleNavigationStateChange = useCallback((event: WebViewNavigation & { title?: string }) => {
+    setCanGoBack(event.canGoBack);
+    setShowLoginHint(typeof event.title === 'string' && event.title.includes('Sign In'));
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'android') {
@@ -91,12 +132,18 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
         </View>
         <View style={styles.headerSpacer} />
       </View>
+      {showLoginHint ? (
+        <View testID="login-hint-banner" style={styles.loginHint}>
+          <Text style={styles.loginHintText} numberOfLines={2}>
+            将在系统浏览器完成登录，请使用与电脑端相同的账号；完成后回到本应用，会话会自动继续。
+          </Text>
+        </View>
+      ) : null}
       <WebView
         ref={webViewRef}
         source={{ uri: sourceUri }}
         style={styles.webView}
         originWhitelist={['https://zcode.z.ai', 'about:*', 'data:*', 'blob:*']}
-        applicationNameForUserAgent="ZCodeMobile/1.0.0"
         javaScriptEnabled
         domStorageEnabled
         sharedCookiesEnabled
@@ -120,21 +167,12 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
           />
         )}
         onShouldStartLoadWithRequest={shouldStartLoad}
-        onNavigationStateChange={(event) => setCanGoBack(event.canGoBack)}
+        onOpenWindow={handleOpenWindow}
+        onNavigationStateChange={handleNavigationStateChange}
         onFileDownload={(event) => {
           const url = event.nativeEvent.downloadUrl;
           if (resolveNavigationTarget(url) !== 'blocked') {
             void openExternal(url);
-          }
-        }}
-        onOpenWindow={(event) => {
-          const url = event.nativeEvent.targetUrl;
-          const target = resolveNavigationTarget(url);
-
-          if (target === 'system') {
-            void openExternal(url);
-          } else if (url.startsWith('https://zcode.z.ai/')) {
-            setSourceUri(url);
           }
         }}
         onContentProcessDidTerminate={() => webViewRef.current?.reload()}
@@ -146,6 +184,14 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
         textZoom={100}
         overScrollMode="never"
       />
+      {authUrl ? (
+        <AuthBrowserModal
+          key={authUrl}
+          visible
+          initialUrl={authUrl}
+          onClose={closeAuthBrowser}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -178,6 +224,14 @@ const styles = StyleSheet.create({
   exitIcon: { color: '#9DB8FF', fontSize: 17, lineHeight: 20, marginTop: -1 },
   exitText: { color: '#9DB8FF', fontSize: 13, fontWeight: '700' },
   headerSpacer: { paddingHorizontal: 26 },
+  loginHint: {
+    backgroundColor: colors.ultramarineSoft,
+    borderBottomColor: colors.hairline,
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  loginHintText: { ...type.body, fontSize: 12.5, lineHeight: 18 },
   linkDot: {
     backgroundColor: colors.signal,
     borderRadius: 4,

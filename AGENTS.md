@@ -31,6 +31,7 @@ npm run android:release  # Android release APK
 ## 安全边界（改代码必须遵守）
 
 - WebView 只允许加载 `https://zcode.z.ai/remote/v4`（见 `src/lib/remote-url.ts` 的 `ZCODE_ORIGIN` / `REMOTE_PATHS`）。放宽白名单属于架构变更。
+- 登录授权域：`src/lib/navigation.ts` 的 `AUTH_ROOTS`（`chat.z.ai` / `bigmodel.cn` 及其子域）映射为 `auth` 目标，由 `AuthBrowserModal` 在应用内打开；但远控页登录页会对嵌入环境做 intent 逃逸强行送系统浏览器，无法完全拦截。应用层兜底：RemoteShell 依据页面标题（含 "Sign In"）显示回流提示条，依赖远控页的 OAuth 轮询设计——浏览器完成登录后回到应用自动接续会话。不要放宽 `AUTH_ROOTS` 到 `z.ai` 根域（docs.z.ai 等文档站须走系统浏览器）。
 - 远控 URL 含会话凭据：只存 SecureStore（`STORAGE_KEY = 'zcode.remote.url.v1'`），UI 展示必须经 `redactRemoteUrl` 脱敏；**禁止**把真实会话链接硬编码进源码、测试、日志或文档（历史上有过移除真实指纹的修复，勿回退）。
 - 构建过程不读取、不注入、不打包 `EXPO_PUBLIC_ZCODE_REMOTE_URL`。
 - 导航分流规则在 `src/lib/navigation.ts`：`zcode.z.ai` 与 `about:/data:/blob:` 留在 WebView；`http(s)/mailto/tel/sms` 交系统浏览器；其余 blocked。改 WebView 行为时同步维护该纯函数及其测试。

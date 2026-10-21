@@ -19,7 +19,7 @@ export type UpdateCheckResult = {
 type GithubReleasePayload = {
   tag_name?: unknown;
   body?: unknown;
-  assets?: Array<{ name?: unknown; browser_download_url?: unknown }>;
+  assets?: { name?: unknown; browser_download_url?: unknown }[];
 };
 
 function normalizeVersion(tag: string): string {

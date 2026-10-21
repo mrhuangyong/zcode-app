@@ -1,12 +1,18 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewProps } from 'react-native-webview';
 import RemoteShell from './RemoteShell';
+import AuthBrowserModal from './AuthBrowserModal';
 
 jest.mock('expo-keep-awake', () => ({ useKeepAwake: jest.fn() }));
 
 jest.mock('react-native-webview', () => ({
+  __esModule: true,
+  default: jest.fn(() => null),
+}));
+
+jest.mock('./AuthBrowserModal', () => ({
   __esModule: true,
   default: jest.fn(() => null),
 }));
@@ -19,6 +25,7 @@ jest.mock('react-native-safe-area-context', () => {
 });
 const webViewMock = WebView as unknown as jest.Mock;
 const safeAreaViewMock = SafeAreaView as unknown as jest.Mock;
+const authBrowserMock = AuthBrowserModal as unknown as jest.Mock;
 
 const remoteUrl =
   'https://zcode.z.ai/remote/v4?sid=session-id&hash=encoded%2Fvalue%3D&t=1&mid=mid&name=Mac.local&app_version=3.7.7';
@@ -36,6 +43,7 @@ function renderShell(overrides: Partial<Parameters<typeof RemoteShell>[0]> = {})
 
 beforeEach(() => {
   webViewMock.mockClear();
+  authBrowserMock.mockClear();
 });
 
 describe('RemoteShell', () => {
@@ -49,7 +57,6 @@ describe('RemoteShell', () => {
     expect(props.sharedCookiesEnabled).toBe(true);
     expect(props.allowsInlineMediaPlayback).toBe(true);
     expect(props.originWhitelist).toEqual(expect.arrayContaining(['https://zcode.z.ai', 'about:*', 'data:*', 'blob:*']));
-    expect(props.applicationNameForUserAgent).toContain('ZCodeMobile');
   });
 
   it('keeps WebView content below the system status bar', async () => {
@@ -86,6 +93,61 @@ describe('RemoteShell', () => {
     expect(decide({ url: remoteUrl })).toBe(true);
     expect(decide({ url: 'https://docs.z.ai/legal-agreement/terms-of-use' })).toBe(false);
     expect(decide({ url: 'javascript:alert(1)' })).toBe(false);
+  });
+
+  it('opens OAuth authorize URLs in the in-app auth browser instead of the system browser', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await renderShell();
+
+    const decide = webViewMock.mock.calls[0][0].onShouldStartLoadWithRequest;
+    const authorizeUrl = 'https://chat.z.ai/api/oauth/authorize?client_id=1&state=abc';
+
+    expect(decide({ url: authorizeUrl })).toBe(false);
+    expect(openURL).not.toHaveBeenCalledWith(authorizeUrl);
+
+    await waitFor(() => expect(authBrowserMock).toHaveBeenCalledWith(
+      expect.objectContaining({ visible: true, initialUrl: authorizeUrl }),
+      undefined,
+    ));
+    openURL.mockRestore();
+  });
+
+  it('routes target=_blank windows through the navigation policy', async () => {
+    await renderShell();
+
+    const props = webViewMock.mock.calls[0][0];
+    expect(props.setSupportMultipleWindows).toBe(true);
+
+    await act(async () => {
+      props.onOpenWindow({ nativeEvent: { targetUrl: 'https://bigmodel.cn/login?redirect_uri=x' } });
+    });
+
+    expect(authBrowserMock).toHaveBeenCalledWith(
+      expect.objectContaining({ visible: true, initialUrl: 'https://bigmodel.cn/login?redirect_uri=x' }),
+      undefined,
+    );
+
+    const lastCall = webViewMock.mock.calls.at(-1)[0];
+    expect(lastCall.source).toEqual({ uri: remoteUrl });
+  });
+
+  it('shows the browser-login hint only while the page is the sign-in screen', async () => {
+    await renderShell();
+
+    expect(screen.queryByTestId('login-hint-banner')).toBeNull();
+
+    const props = webViewMock.mock.calls[0][0];
+    await act(async () => {
+      props.onNavigationStateChange({ url: remoteUrl, title: 'ZCode - Web Remote Control Sign In', canGoBack: false });
+    });
+
+    expect(screen.getByTestId('login-hint-banner')).toBeTruthy();
+
+    await act(async () => {
+      props.onNavigationStateChange({ url: remoteUrl, title: 'ZCode - Web Remote Control', canGoBack: true });
+    });
+
+    expect(screen.queryByTestId('login-hint-banner')).toBeNull();
   });
 
   it('hands file downloads to the system browser or download handler', async () => {

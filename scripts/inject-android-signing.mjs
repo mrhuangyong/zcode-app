@@ -1,6 +1,7 @@
 // CI 发布脚本：prebuild 之后注入正式签名。
 // 环境变量（来自 GitHub secrets）：ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD /
 // ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD。任一缺失时跳过，保留模板 debug 签名（本地构建）。
+// 幂等：重复执行不会重复插入 signingConfig。
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -29,8 +30,7 @@ writeFileSync(keystoreFile, Buffer.from(base64, 'base64'));
 
 let gradle = readFileSync(gradleFile, 'utf8');
 
-const signingConfig = `
-    signingConfigs {
+const releaseSigningConfig = `    signingConfigs {
         release {
             storeFile file('upload.keystore')
             storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
@@ -38,19 +38,25 @@ const signingConfig = `
             keyPassword System.getenv("ANDROID_KEY_PASSWORD")
         }
     }
+
 `;
 
-const releaseBlock = /signingConfig signingConfigs\.debug/g;
+// 幂等：release signingConfig 只插入一次，插在 android { 之后。
+if (!gradle.includes("storeFile file('upload.keystore')")) {
+  gradle = gradle.replace(/android \{/, (match) => `${match}\n${releaseSigningConfig}`);
+}
 
-if (releaseBlock.test(gradle)) {
-  gradle = gradle.replace(
-    /android \{/,
-    (match) => `${match}${signingConfig}`,
-  ).replace(/signingConfig signingConfigs\.debug/g, 'signingConfig signingConfigs.release');
+// 只把 release buildType 的签名改为 release，debug buildType 保持 debug keystore。
+gradle = gradle.replace(
+  /(release \{(?:(?!^\s{4}\}).)*?)signingConfig signingConfigs\.debug/s,
+  (match, prefix) => `${prefix}signingConfig signingConfigs.release`,
+);
 
-  writeFileSync(gradleFile, gradle);
-  console.log('release signing config injected');
-} else {
+writeFileSync(gradleFile, gradle);
+
+if (!gradle.includes('signingConfig signingConfigs.release')) {
   console.error('unexpected build.gradle template: debug signing reference not found');
   process.exit(1);
 }
+
+console.log('release signing config injected');

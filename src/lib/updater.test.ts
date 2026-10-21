@@ -1,9 +1,3 @@
-jest.mock('expo-constants', () => ({
-  __esModule: true,
-  default: { expoConfig: { version: '1.0.0' } },
-}));
-
-import Constants from 'expo-constants';
 import {
   checkForUpdate,
   compareVersions,
@@ -11,6 +5,11 @@ import {
   fetchLatestRelease,
   getCurrentVersion,
 } from './updater';
+
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { version: '1.0.0' } },
+}));
 
 globalThis.fetch = jest.fn();
 

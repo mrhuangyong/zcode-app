@@ -8,6 +8,22 @@ describe('navigation target policy', () => {
     expect(resolveNavigationTarget('blob:https://zcode.z.ai/session')).toBe('webview');
   });
 
+  it('routes OAuth pages on the auth provider trees to the in-app auth browser', () => {
+    expect(resolveNavigationTarget('https://chat.z.ai/api/oauth/authorize?client_id=1')).toBe('auth');
+    expect(resolveNavigationTarget('https://bigmodel.cn/login?redirect_uri=x')).toBe('auth');
+    expect(resolveNavigationTarget('https://www.bigmodel.cn/login?redirect_uri=x')).toBe('auth');
+    expect(resolveNavigationTarget('https://open.bigmodel.cn/oauth')).toBe('auth');
+    expect(resolveNavigationTarget('https://www.chat.z.ai/login')).toBe('auth');
+  });
+
+  it('keeps look-alike hosts, unrelated z.ai subdomains, and non-HTTPS schemes on the system browser', () => {
+    expect(resolveNavigationTarget('https://evil-z.ai/api/oauth/authorize')).toBe('system');
+    expect(resolveNavigationTarget('https://z.ai.evil.example/login')).toBe('system');
+    expect(resolveNavigationTarget('https://notzcode.z.ai.evil.com/login')).toBe('system');
+    expect(resolveNavigationTarget('https://docs.z.ai/legal-agreement/terms-of-use')).toBe('system');
+    expect(resolveNavigationTarget('http://chat.z.ai/api/oauth/authorize')).toBe('system');
+  });
+
   it('sends trusted external documents and communication links to the system', () => {
     expect(resolveNavigationTarget('https://docs.z.ai/legal-agreement/terms-of-use')).toBe('system');
     expect(resolveNavigationTarget('http://example.com/help')).toBe('system');

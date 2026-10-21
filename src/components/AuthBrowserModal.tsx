@@ -43,6 +43,9 @@ const windowOpenShim = `
 })();
 `;
 
+const WEBVIEW_UA =
+  "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
+
 export default function AuthBrowserModal({ visible, initialUrl, onClose }: AuthBrowserModalProps) {
   const webViewRef = useRef<React.ComponentRef<typeof WebView>>(null);
   // RemoteShell 以 key={authUrl} 挂载本组件：每次新的授权 URL 都是一次全新挂载，
@@ -171,6 +174,7 @@ export default function AuthBrowserModal({ visible, initialUrl, onClose }: AuthB
             </View>
           )}
           onShouldStartLoadWithRequest={shouldStartLoad}
+          userAgent={WEBVIEW_UA}
           onNavigationStateChange={handleNavigationStateChange}
           onOpenWindow={handleOpenWindow}
           injectedJavaScriptBeforeContentLoaded={windowOpenShim}

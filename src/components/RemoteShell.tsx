@@ -17,6 +17,31 @@ import { colors, type } from '../lib/theme';
 import AuthBrowserModal from './AuthBrowserModal';
 import ErrorScreen from './ErrorScreen';
 
+const WEBVIEW_UA =
+  "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
+
+// 登录页（zcode/chat.z.ai/bigmodel）会做 WebView 检测并强制跳系统浏览器，
+// 导致 OAuth 回调上下文错乱（"OAuth CSRF 检测失败"）。补齐普通浏览器的特征：
+// window.chrome 对象 + 覆写 window.open 为当前窗口导航，让授权流程留在应用内完成。
+const BROWSER_SHIM = `
+(function() {
+  if (!window.chrome) {
+    window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {} };
+  }
+  window.open = function(url) {
+    if (typeof url === 'string' && url.length > 0) {
+      window.location.href = url;
+    }
+    var stub = { closed: false, opener: null, focus: function() {}, close: function() {} };
+    Object.defineProperty(stub, 'location', {
+      set: function(value) { window.location.href = value; },
+      get: function() { return window.location; },
+    });
+    return stub;
+  };
+})();
+`;
+
 type RemoteShellProps = {
   remoteUrl: string;
   deviceName: string;
@@ -149,7 +174,7 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
       {showLoginHint ? (
         <View testID="login-hint-banner" style={styles.loginHint}>
           <Text style={styles.loginHintText} numberOfLines={2}>
-            请在系统浏览器用与电脑端相同的账号登录（尽量在 2 分钟内完成），完成后立即返回本应用，会话会自动接续。
+            登录会跳转系统浏览器：请用与电脑端相同的账号完成登录后返回本应用，再点一次登录即可自动接续（第二次无需重复输密码）。
           </Text>
         </View>
       ) : null}
@@ -181,6 +206,8 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
           />
         )}
         onShouldStartLoadWithRequest={shouldStartLoad}
+        userAgent={WEBVIEW_UA}
+        injectedJavaScriptBeforeContentLoaded={BROWSER_SHIM}
         onOpenWindow={handleOpenWindow}
         onNavigationStateChange={handleNavigationStateChange}
         onFileDownload={(event) => {

@@ -31,7 +31,7 @@ npm run android:release  # Android release APK
 ## 安全边界（改代码必须遵守）
 
 - WebView 只允许加载 `https://zcode.z.ai/remote/v4`（见 `src/lib/remote-url.ts` 的 `ZCODE_ORIGIN` / `REMOTE_PATHS`）。放宽白名单属于架构变更。
-- 登录授权域：`src/lib/navigation.ts` 的 `AUTH_ROOTS`（`chat.z.ai` / `bigmodel.cn` 及其子域）映射为 `auth` 目标，由 `AuthBrowserModal` 在应用内打开；但远控页登录页会对嵌入环境做 intent 逃逸强行送系统浏览器，无法完全拦截。应用层兜底：RemoteShell 依据页面标题（含 "Sign In"）显示回流提示条，依赖远控页的 OAuth 轮询设计——浏览器完成登录后回到应用自动接续会话。不要放宽 `AUTH_ROOTS` 到 `z.ai` 根域（docs.z.ai 等文档站须走系统浏览器）。
+- 登录授权域：`src/lib/navigation.ts` 的 `AUTH_ROOTS`（`chat.z.ai` / `bigmodel.cn` 及其子域）映射为 `auth` 目标，由 `AuthBrowserModal` 在应用内打开；但远控页登录页会对嵌入环境做 intent 逃逸强行送系统浏览器，无法完全拦截。登录实现（勿回退为系统浏览器方案）：远控页把 OAuth 授权页用 window.open/intent:// 强行送系统浏览器，而 OAuth 的 CSRF state 存在 WebView 的 localStorage（oauth_pending_logins），跨上下文回调必然失败。当前实现：RemoteShell 注入 BROWSER_SHIM（window.chrome 垫片 + window.open 改写为当前窗口导航 + 轮询 oauth_pending_logins），读到待登录请求后自建授权 URL 交给 AuthBrowserModal 在应用内完成登录（共享存储，CSRF 通过），overlay 关闭后 reload 主页面接管会话。另依赖 scripts/patch-webview-popups.mjs 原生补丁（RN 0.86 Fabric 下 onShouldStartLoadWithRequest 静默失效，导航策略必须下沉到原生层；npm ci 后需重跑）。不要放宽 `AUTH_ROOTS` 到 `z.ai` 根域（docs.z.ai 等文档站须走系统浏览器）。
 - 远控 URL 含会话凭据：只存 SecureStore（`STORAGE_KEY = 'zcode.remote.url.v1'`），UI 展示必须经 `redactRemoteUrl` 脱敏；**禁止**把真实会话链接硬编码进源码、测试、日志或文档（历史上有过移除真实指纹的修复，勿回退）。
 - 构建过程不读取、不注入、不打包 `EXPO_PUBLIC_ZCODE_REMOTE_URL`。
 - 导航分流规则在 `src/lib/navigation.ts`：`zcode.z.ai` 与 `about:/data:/blob:` 留在 WebView；`http(s)/mailto/tel/sms` 交系统浏览器；其余 blocked。改 WebView 行为时同步维护该纯函数及其测试。

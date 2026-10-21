@@ -47,7 +47,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
+      # runner 预装 Android SDK（ANDROID_HOME 已就绪），无需 setup-android。
 
       - name: Prebuild android
         run: npx expo prebuild --platform android --no-install

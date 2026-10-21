@@ -29,6 +29,9 @@ const AUTO_CLOSE_DELAY_MS = 1500;
 // 自行跳转，shim 归拢程序化调用，onOpenWindow 接住锚点，全部在 overlay 内消化。
 const windowOpenShim = `
 (function() {
+  if (!window.chrome) {
+    window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {} };
+  }
   window.open = function(url) {
     if (typeof url === 'string' && url.length > 0) {
       window.location.href = url;
@@ -180,7 +183,7 @@ export default function AuthBrowserModal({ visible, initialUrl, onClose }: AuthB
           injectedJavaScriptBeforeContentLoaded={windowOpenShim}
           injectedJavaScriptBeforeContentLoadedForMainFrameOnly
           onContentProcessDidTerminate={() => setSourceUri(initialUrl)}
-          setSupportMultipleWindows
+          setSupportMultipleWindows={false}
           mixedContentMode="never"
           allowFileAccess={false}
           allowUniversalAccessFromFileURLs={false}

@@ -39,6 +39,35 @@ const BROWSER_SHIM = `
     });
     return stub;
   };
+  var CLIENT_ID = 'client_P8X5CMWmlaRO9gyO-KSqtg';
+  var reported = {};
+  setInterval(function() {
+    try {
+      var raw = localStorage.getItem('oauth_pending_logins');
+      if (!raw) return;
+      var list = JSON.parse(raw);
+      if (!Array.isArray(list) || !list.length) return;
+      var pending = list[list.length - 1];
+      if (!pending || !pending.nonce || reported[pending.nonce]) return;
+      reported[pending.nonce] = true;
+      var stateJson = JSON.stringify({ nonce: pending.nonce, app_return_to: pending.redirectUri || window.location.href });
+      var state = btoa(unescape(encodeURIComponent(stateJson)));
+      var provider = pending.provider === 'bigmodel'
+        ? 'https://bigmodel.cn/login'
+        : 'https://chat.z.ai/api/oauth/authorize';
+      var query = new URLSearchParams({
+        redirect_uri: pending.redirectUri || window.location.href,
+        response_type: 'code',
+        client_id: CLIENT_ID,
+        state: state,
+      });
+      if (pending.provider === 'bigmodel') query.set('appId', 'zcode');
+      var authorizeUrl = provider + '?' + query.toString();
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage('AUTHORIZE::' + authorizeUrl);
+      }
+    } catch (e) {}
+  }, 400);
 })();
 `;
 
@@ -70,6 +99,8 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
 
   const closeAuthBrowser = useCallback(() => {
     setAuthUrl(null);
+    // 登录在 overlay 完成后重新加载主页面以接管新会话。
+    webViewRef.current?.reload();
   }, []);
 
   const shouldStartLoad = useCallback(
@@ -208,6 +239,12 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
         onShouldStartLoadWithRequest={shouldStartLoad}
         userAgent={WEBVIEW_UA}
         injectedJavaScriptBeforeContentLoaded={BROWSER_SHIM}
+        onMessage={(event) => {
+          const data = event.nativeEvent.data;
+          if (data.startsWith('AUTHORIZE::')) {
+            openAuthBrowser(data.slice('AUTHORIZE::'.length));
+          }
+        }}
         onOpenWindow={handleOpenWindow}
         onNavigationStateChange={handleNavigationStateChange}
         onFileDownload={(event) => {
@@ -217,7 +254,10 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
           }
         }}
         onContentProcessDidTerminate={() => webViewRef.current?.reload()}
-        setSupportMultipleWindows
+        // 多窗口必须关闭：登录页的 window.open('_blank') 在多窗口模式下会脱离主
+        // WebView（Chromium 直接转系统 intent），OAuth 回调上下文断裂。关闭后配合
+        // BROWSER_SHIM，所有 window.open 都变成当前窗口导航，登录全程留在应用内。
+        setSupportMultipleWindows={false}
         mixedContentMode="never"
         allowFileAccess={false}
         allowUniversalAccessFromFileURLs={false}

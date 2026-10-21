@@ -116,7 +116,7 @@ describe('RemoteShell', () => {
     await renderShell();
 
     const props = webViewMock.mock.calls[0][0];
-    expect(props.setSupportMultipleWindows).toBe(true);
+    expect(props.setSupportMultipleWindows).toBe(false);
 
     await act(async () => {
       props.onOpenWindow({ nativeEvent: { targetUrl: 'https://bigmodel.cn/login?redirect_uri=x' } });

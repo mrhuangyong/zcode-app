@@ -61,7 +61,7 @@ describe('AuthBrowserModal', () => {
     );
 
     const props = webViewProps();
-    expect(props.setSupportMultipleWindows).toBe(true);
+    expect(props.setSupportMultipleWindows).toBe(false);
 
     await act(async () => {
       props.onOpenWindow({ nativeEvent: { targetUrl: 'https://open.bigmodel.cn/oauth/next' } });

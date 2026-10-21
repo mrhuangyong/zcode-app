@@ -148,6 +148,9 @@ const popupClientPatched = `        final WebView.WebViewTransport transport = (
         transport.setWebView(popupWebView);
         resultMsg.sendToTarget();`;
 
+// 幂等：若已是旧版补丁形态，先归一回原始模板再应用最新补丁。
+chromeSource = chromeSource.replace(popupClientPatched, popupClientOriginal);
+
 if (!chromeSource.includes(popupClientOriginal)) {
   console.error('unexpected RNCWebChromeClient.java template; patch not applied');
   process.exit(1);

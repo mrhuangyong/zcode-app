@@ -78,7 +78,7 @@ describe('secure device store', () => {
   it('filters out invalid device entries when loading', async () => {
     mockStored([
       { id: 'a', url: remoteUrl, name: 'Workstation', createdAt: 1, lastConnectedAt: 2 },
-      { id: 'b', url: 'https://evil.example/remote/v4', name: 'Evil', createdAt: 1, lastConnectedAt: 2 },
+      { id: 'b', url: 'javascript:alert(1)', name: 'Evil', createdAt: 1, lastConnectedAt: 2 },
       { id: '', url: otherUrl, name: 'NoId', createdAt: 1, lastConnectedAt: 2 },
     ]);
 
@@ -96,8 +96,15 @@ describe('secure device store', () => {
     expect(storedDevices()).toHaveLength(1);
   });
 
+  it('defaults the device name to the URL hostname when no name param exists', async () => {
+    const device = (await upsertDevice('http://192.168.1.10:8080/remote?sid=1'))!;
+
+    expect(device).toMatchObject({ url: 'http://192.168.1.10:8080/remote?sid=1', name: '192.168.1.10' });
+  });
+
   it('rejects an unsafe URL instead of storing it', async () => {
-    await expect(upsertDevice('https://evil.example/remote/v4')).resolves.toBeNull();
+    await expect(upsertDevice('javascript:alert(1)')).resolves.toBeNull();
+    await expect(upsertDevice('not a url')).resolves.toBeNull();
     expect(setItemAsync).not.toHaveBeenCalled();
   });
 

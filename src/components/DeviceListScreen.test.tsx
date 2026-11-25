@@ -202,7 +202,7 @@ describe('DeviceListScreen', () => {
     await act(async () => {
 
 
-      fireEvent.changeText(screen.getByTestId('remote-url-input'), 'https://evil.example/remote/v4');
+      fireEvent.changeText(screen.getByTestId('remote-url-input'), 'javascript:alert(1)');
 
 
     });
@@ -241,6 +241,36 @@ describe('DeviceListScreen', () => {
     });
 
     expect(onConnect).toHaveBeenCalledWith(remoteUrl);
+  });
+
+  it('connects an arbitrary self-hosted http URL', async () => {
+    const onConnect = jest.fn();
+    const selfHostedUrl = 'http://192.168.1.10:8080/remote?sid=1';
+    await render(
+      <DeviceListScreen
+        devices={[]}
+        activeDeviceId={null}
+        update={null}
+        onUpdateDismissed={jest.fn()}
+        onConnect={onConnect}
+        onRenameDevice={jest.fn()}
+        onDeleteDevice={jest.fn()}
+        onScanRequest={jest.fn()}
+      />,
+    );
+
+    await act(async () => {
+
+
+      fireEvent.changeText(screen.getByTestId('remote-url-input'), selfHostedUrl);
+
+
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('connect-button'));
+    });
+
+    expect(onConnect).toHaveBeenCalledWith(selfHostedUrl);
   });
 
   it('renders the update banner and opens the download link', async () => {

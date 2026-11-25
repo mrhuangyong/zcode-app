@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
@@ -13,6 +13,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 import { resolveIntentTargetUrl, resolveNavigationTarget } from '../lib/navigation';
+import { isHomeOrigin } from '../lib/remote-url';
 import { colors, type } from '../lib/theme';
 import AuthBrowserModal from './AuthBrowserModal';
 import ErrorScreen from './ErrorScreen';
@@ -91,6 +92,9 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
   const [showLoginHint, setShowLoginHint] = useState(false);
   // 供 onMessage 回调读取最新值（避免闭包过期）。
   const showLoginHintRef = useRef(false);
+  // 主 URL origin：用户添加的远控页 origin 即本 WebView 的「家」，
+  // 站内导航留在应用内，跨域 http(s) 链接交系统浏览器。remoteUrl 已过 normalizeRemoteUrl 校验。
+  const homeOrigin = useMemo(() => new URL(remoteUrl).origin, [remoteUrl]);
 
   const openExternal = useCallback(async (url: string) => {
     try {
@@ -112,7 +116,7 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
 
   const shouldStartLoad = useCallback(
     (request: Pick<WebViewNavigation, 'url'>) => {
-      const target = resolveNavigationTarget(request.url);
+      const target = resolveNavigationTarget(request.url, homeOrigin);
 
       // intent:// 链接必须始终由我们接管（返回 true 阻断）：放行给 Chromium 的默认
       // 处理会解析 package=com.android.chrome 直接拉起系统浏览器。
@@ -143,24 +147,24 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
 
       return false;
     },
-    [openAuthBrowser, openExternal],
+    [homeOrigin, openAuthBrowser, openExternal],
   );
 
   const handleOpenWindow = useCallback(
     (event: { nativeEvent: { targetUrl: string } }) => {
       const url = event.nativeEvent.targetUrl;
-      const target = resolveNavigationTarget(url);
+      const target = resolveNavigationTarget(url, homeOrigin);
 
       if (target === 'auth') {
         openAuthBrowser(resolveIntentTargetUrl(url) ?? url);
       } else if (target === 'system') {
         void openExternal(url);
-      } else if (url.startsWith('https://zcode.z.ai/')) {
+      } else if (target === 'webview' && isHomeOrigin(url, homeOrigin)) {
         setSourceUri(url);
       }
       // 其余（about:blank 等）忽略。
     },
-    [openAuthBrowser, openExternal],
+    [homeOrigin, openAuthBrowser, openExternal],
   );
 
   // 登录页会把 OAuth 授权链接包成 intent:// 强行送系统浏览器（navigation.ts 会解析拦截）。
@@ -222,7 +226,7 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
         ref={webViewRef}
         source={{ uri: sourceUri }}
         style={styles.webView}
-        originWhitelist={['https://zcode.z.ai', 'about:*', 'data:*', 'blob:*']}
+        originWhitelist={[homeOrigin, 'about:*', 'data:*', 'blob:*']}
         javaScriptEnabled
         domStorageEnabled
         sharedCookiesEnabled
@@ -240,7 +244,7 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
         )}
         renderError={(code) => (
           <ErrorScreen
-            message={`无法加载 ZCode 远控页面（${code}）。请检查网络后重试。`}
+            message={`无法加载远控页面（${code}）。请检查网络后重试。`}
             onRetry={() => webViewRef.current?.reload()}
             onSetup={onExit}
           />
@@ -259,7 +263,7 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
         onNavigationStateChange={handleNavigationStateChange}
         onFileDownload={(event) => {
           const url = event.nativeEvent.downloadUrl;
-          if (resolveNavigationTarget(url) !== 'blocked') {
+          if (resolveNavigationTarget(url, homeOrigin) !== 'blocked') {
             void openExternal(url);
           }
         }}
@@ -280,6 +284,7 @@ export default function RemoteShell({ remoteUrl, deviceName, onExit }: RemoteShe
           key={authUrl}
           visible
           initialUrl={authUrl}
+          homeOrigin={homeOrigin}
           onClose={closeAuthBrowser}
         />
       ) : null}

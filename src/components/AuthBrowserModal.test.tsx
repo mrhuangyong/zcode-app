@@ -112,6 +112,32 @@ describe('AuthBrowserModal', () => {
     jest.useRealTimers();
   });
 
+  it('closes automatically when a self-hosted home origin callback lands', async () => {
+    jest.useFakeTimers();
+    const onClose = jest.fn();
+    await render(
+      <AuthBrowserModal
+        visible
+        initialUrl={authorizeUrl}
+        homeOrigin="https://self-hosted.example.net/panel"
+        onClose={onClose}
+      />,
+    );
+
+    await act(async () => {
+      webViewProps().onNavigationStateChange({ url: 'https://self-hosted.example.net/oauth/callback?code=1' });
+    });
+
+    expect(screen.getByText('登录完成 ✓ 正在返回…')).toBeTruthy();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1600);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
   it('closes manually via the close button', async () => {
     const onClose = jest.fn();
     await render(

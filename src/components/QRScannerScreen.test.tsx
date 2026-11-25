@@ -105,11 +105,23 @@ describe('QRScannerScreen', () => {
 
     expect(screen.queryByTestId('scanner-error')).toBeNull();
     await act(async () => {
-      cameraProps().onBarcodeScanned({ data: 'https://evil.example/remote/v4' });
+      cameraProps().onBarcodeScanned({ data: 'javascript:alert(1)' });
     });
 
     expect(screen.getByTestId('scanner-error')).toBeTruthy();
     expect(onConnect).not.toHaveBeenCalled();
+  });
+
+  it('accepts a self-hosted http QR URL', async () => {
+    mockPermission(true);
+    const onConnect = jest.fn(async () => undefined);
+    await render(<QRScannerScreen visible onClose={jest.fn()} onConnect={onConnect} />);
+
+    await act(async () => {
+      cameraProps().onBarcodeScanned({ data: 'http://192.168.1.10:8080/remote?sid=1' });
+    });
+
+    expect(onConnect).toHaveBeenCalledWith('http://192.168.1.10:8080/remote?sid=1');
   });
 
   it('offers permission recovery when camera access is denied', async () => {
@@ -197,7 +209,7 @@ describe('QRScannerScreen', () => {
       canceled: false,
       assets: [{ uri: 'file:///tmp/evil.png' }],
     });
-    decodeQrFromImageMock.mockResolvedValue('https://evil.example/remote/v4?sid=1');
+    decodeQrFromImageMock.mockResolvedValue('javascript:alert(1)?sid=1');
     await render(<QRScannerScreen visible onClose={jest.fn()} onConnect={onConnect} />);
 
     await act(async () => {

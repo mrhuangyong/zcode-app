@@ -5,10 +5,13 @@
 // 存在主 WebView 的存储上下文——授权页必须在应用内完成，否则必然 "OAuth CSRF 检测失败"。
 //
 // 原生策略（zcodeHandleNavigation）：
-//   zcode.z.ai / about: / data: / blob:            → 在本 WebView 加载
-//   z.ai / bigmodel.cn 及其子域（含 intent 内层）    → 在主 WebView 加载（登录留在应用内）
-//   其余 http(s)                                    → 系统浏览器
-//   其余 scheme（javascript:/intent 无法解析等）      → 阻断
+//   与主 WebView 当前页同源（任意 http(s)）/ about: / data: / blob: → 在本 WebView 加载
+//   z.ai / bigmodel.cn 及其子域（含 intent 内层）                    → 在主 WebView 加载（登录留在应用内）
+//   其余 http(s)                                                    → 系统浏览器
+//   其余 scheme（javascript:/intent 无法解析等）                     → 阻断
+//
+// 同源规则让「新建链接」支持任意 URL：用户添加的主 URL origin 即 WebView 的家，
+// 站内跳转/重定向留在应用内；首次加载走 loadUrl 不经过本回调，无需特判。
 //
 // 幂等：带 ZCODE_REMOTE_PATCH 标记时跳过。npm ci 会还原 node_modules，
 // CI 在 npm ci 之后、gradle 之前运行；本地重装依赖后同样需要重跑。
@@ -44,7 +47,8 @@ for (const file of [chromeClientFile, webViewClientFile]) {
 const NAVIGATION_HELPER = `
     // ZCODE_REMOTE_PATCH: native navigation policy. The JS
     // onShouldStartLoadWithRequest lock is silently broken on Fabric (RN 0.86),
-    // so the policy lives here: keep zcode + OAuth login pages inside this
+    // so the policy lives here: keep the user-added remote origin (same origin
+    // as this WebView's current page) and zcode/OAuth login pages inside this
     // WebView's storage context, hand other http(s) to the system browser,
     // block everything else (including intent:// Chrome escapes).
     public static boolean zcodeHandleNavigation(WebView view, String url) {
@@ -73,7 +77,7 @@ const NAVIGATION_HELPER = `
                         : innerScheme + "://" + body;
                 android.net.Uri innerUri = android.net.Uri.parse(inner);
                 String innerHost = innerUri.getHost() == null ? "" : innerUri.getHost();
-                if (isZcodeOrAuthHost(innerUri)) {
+                if (isZcodeOrAuthHost(innerUri) || isSameOrigin(view, innerUri)) {
                     final String target = inner;
                     view.post(() -> view.loadUrl(target));
                 }
@@ -81,6 +85,14 @@ const NAVIGATION_HELPER = `
             }
 
             if (scheme.equals("about") || scheme.equals("data") || scheme.equals("blob")) {
+                return false;
+            }
+
+            // Same origin as the page this WebView is showing (the user-added
+            // remote origin) stays inside: in-site navigation and redirects of
+            // any http(s) home URL. First load arrives via loadUrl and never
+            // reaches this callback.
+            if (isSameOrigin(view, u)) {
                 return false;
             }
 
@@ -121,6 +133,22 @@ const NAVIGATION_HELPER = `
         }
         return false;
     }
+
+    // ZCODE_REMOTE_PATCH: same scheme+host as the WebView's current page
+    // (ignores port, mirroring the JS isHomeOrigin rule).
+    private static boolean isSameOrigin(WebView view, android.net.Uri u) {
+        String current = view.getUrl();
+        if (current == null) {
+            return false;
+        }
+        android.net.Uri cur = android.net.Uri.parse(current);
+        String scheme = u.getScheme() == null ? "" : u.getScheme();
+        String curScheme = cur.getScheme() == null ? "" : cur.getScheme();
+        String host = u.getHost() == null ? "" : u.getHost();
+        String curHost = cur.getHost() == null ? "" : cur.getHost();
+        return (scheme.equals("https") || scheme.equals("http"))
+                && scheme.equals(curScheme) && host.equals(curHost);
+    }
 `;
 
 // ---- RNCWebChromeClient：popup 子 WebView 也套用原生策略 + 注入 helper ----
@@ -148,7 +176,15 @@ const popupClientPatched = `        final WebView.WebViewTransport transport = (
         transport.setWebView(popupWebView);
         resultMsg.sendToTarget();`;
 
-// 幂等：若已是旧版补丁形态，先归一回原始模板再应用最新补丁。
+// 幂等：若已是补丁形态，先归一回原始模板再应用最新补丁。
+// 注意：行过滤器会剥离补丁模板里带 ZCODE_REMOTE_PATCH 标记的注释行，
+// 所以落盘形态是「无标记注释版」，回退时两种形态都要处理。
+const popupClientPatchedStripped = popupClientPatched
+  .split('\n')
+  .filter((line) => !line.includes('ZCODE_REMOTE_PATCH'))
+  .join('\n');
+
+chromeSource = chromeSource.replace(popupClientPatchedStripped, popupClientOriginal);
 chromeSource = chromeSource.replace(popupClientPatched, popupClientOriginal);
 
 if (!chromeSource.includes(popupClientOriginal)) {
@@ -159,6 +195,16 @@ if (!chromeSource.includes(popupClientOriginal)) {
 chromeSource = chromeSource.replace(popupClientOriginal, popupClientPatched);
 
 const chromeClassMarker = 'public class RNCWebChromeClient extends WebChromeClient implements LifecycleEventListener {';
+// 防呆：node_modules 里若残留旧版补丁的 helper（缺同源规则），拒绝静默保留旧策略，
+// 要求重装依赖后重跑（CI 每次都从全新 node_modules 打补丁，不受影响）。
+if (
+  chromeSource.includes('static boolean zcodeHandleNavigation') &&
+  !chromeSource.includes('isSameOrigin(view, u)')
+) {
+  console.error('stale webview patch detected (missing same-origin rule); run npm ci first, then re-run this script');
+  process.exit(1);
+}
+
 if (!chromeSource.includes('static boolean zcodeHandleNavigation')) {
   chromeSource = chromeSource.replace(
     chromeClassMarker,

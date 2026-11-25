@@ -95,6 +95,42 @@ describe('RemoteShell', () => {
     expect(decide({ url: 'javascript:alert(1)' })).toBe(false);
   });
 
+  it('keeps an arbitrary home origin in the WebView and externalizes cross-origin links', async () => {
+    const selfHostedUrl = 'http://192.168.1.10:8080/remote?sid=1';
+    await renderShell({ remoteUrl: selfHostedUrl });
+
+    const props = webViewMock.mock.calls[0][0];
+    expect(props.source).toEqual({ uri: selfHostedUrl });
+    expect(props.originWhitelist).toEqual(
+      expect.arrayContaining(['http://192.168.1.10:8080', 'about:*', 'data:*', 'blob:*']),
+    );
+
+    const decide = props.onShouldStartLoadWithRequest;
+    expect(decide({ url: 'http://192.168.1.10:8080/session' })).toBe(true);
+    expect(decide({ url: 'https://other.example.net/help' })).toBe(false);
+    expect(decide({ url: 'https://chat.z.ai/api/oauth/authorize?client_id=1' })).toBe(false);
+  });
+
+  it('navigates the main WebView for same-origin popups of an arbitrary home origin', async () => {
+    const selfHostedUrl = 'http://192.168.1.10:8080/remote?sid=1';
+    await renderShell({ remoteUrl: selfHostedUrl });
+
+    const props = webViewMock.mock.calls[0][0];
+
+    await act(async () => {
+      props.onOpenWindow({ nativeEvent: { targetUrl: 'http://192.168.1.10:8080/session' } });
+    });
+
+    const lastCall = webViewMock.mock.calls.at(-1)[0];
+    expect(lastCall.source).toEqual({ uri: 'http://192.168.1.10:8080/session' });
+
+    await act(async () => {
+      props.onOpenWindow({ nativeEvent: { targetUrl: 'https://other.example.net/help' } });
+    });
+
+    expect(webViewMock.mock.calls.at(-1)[0].source).toEqual({ uri: 'http://192.168.1.10:8080/session' });
+  });
+
   it('opens OAuth authorize URLs in the in-app auth browser instead of the system browser', async () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await renderShell();

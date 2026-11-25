@@ -1,8 +1,5 @@
-export const ZCODE_ORIGIN = 'https://zcode.z.ai';
 export const STORAGE_KEY = 'zcode.remote.url.v1';
 export const DEVICES_STORAGE_KEY = 'zcode.remote.devices.v1';
-
-const REMOTE_PATHS = new Set(['/remote/v4', '/remote/v4/']);
 
 function parseUrl(input: string): URL | null {
   if (typeof input !== 'string' || input.trim().length === 0) {
@@ -23,15 +20,25 @@ function toSafeUrl(input: string): URL | null {
     return null;
   }
 
-  if (url.protocol !== 'https:' || url.hostname !== 'zcode.z.ai') {
-    return null;
-  }
-
-  if (!REMOTE_PATHS.has(url.pathname)) {
+  // 任意远控页面均可作为主链接，只要求 http(s) 协议；
+  // 其他 scheme（javascript:/file: 等）与非 URL 一律拒绝。
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
     return null;
   }
 
   return url;
+}
+
+// 判断 rawUrl 是否与主 URL 同源（比较协议 + 主机名，忽略端口，与原生导航策略对齐）。
+export function isHomeOrigin(rawUrl: string, home: string): boolean {
+  const url = parseUrl(rawUrl);
+  const homeUrl = parseUrl(home);
+
+  if (!url || !homeUrl) {
+    return false;
+  }
+
+  return url.protocol === homeUrl.protocol && url.hostname === homeUrl.hostname;
 }
 
 export function normalizeRemoteUrl(input: string): string | null {

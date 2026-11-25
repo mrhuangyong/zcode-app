@@ -57,7 +57,7 @@ export default function DeviceListScreen({
 
   const connect = () => {
     if (!normalized) {
-      setError('链接无效：请粘贴 ZCode 桌面端生成的 https://zcode.z.ai/remote/v4 远控地址。');
+      setError('链接无效：请粘贴以 http(s):// 开头的远控页面地址。');
       return;
     }
 
@@ -208,7 +208,7 @@ export default function DeviceListScreen({
               setError(null);
             }}
             style={[styles.input, error ? styles.inputError : null]}
-            placeholder="https://zcode.z.ai/remote/v4?..."
+            placeholder="https://your-remote.example.com?..."
             placeholderTextColor={colors.faint}
             multiline
             autoCapitalize="none"

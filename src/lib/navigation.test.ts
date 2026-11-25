@@ -50,4 +50,23 @@ describe('navigation target policy', () => {
     expect(resolveNavigationTarget('unknown://payload')).toBe('blocked');
     expect(resolveNavigationTarget('invalid url')).toBe('blocked');
   });
+
+  it('keeps the caller-provided home origin (http or https) inside the WebView', () => {
+    const home = 'https://self-hosted.example.net/panel?sid=1';
+
+    expect(resolveNavigationTarget('https://self-hosted.example.net/page', home)).toBe('webview');
+    expect(resolveNavigationTarget('http://192.168.1.10:9000/other', 'http://192.168.1.10:8080/remote')).toBe('webview');
+    expect(resolveNavigationTarget('https://other.example.net/page', home)).toBe('system');
+    expect(resolveNavigationTarget('http://self-hosted.example.net/page', home)).toBe('system');
+  });
+
+  it('treats same-origin intent escapes as WebView targets', () => {
+    const sameOriginIntent =
+      'intent://self-hosted.example.net/session#Intent;scheme=https;package=com.android.chrome;end';
+
+    expect(resolveNavigationTarget(sameOriginIntent, 'https://self-hosted.example.net/panel')).toBe('webview');
+    expect(
+      resolveNavigationTarget('intent://chat.z.ai/auth#Intent;scheme=https;end', 'https://self-hosted.example.net/panel'),
+    ).toBe('auth');
+  });
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -16,11 +16,13 @@ import { colors } from '../lib/theme';
 type AuthBrowserModalProps = {
   visible: boolean;
   initialUrl: string | null;
+  /** 主远控页 origin（RemoteShell 传入）：用于站内导航判定与登录完成自动关闭。 */
+  homeOrigin?: string;
   onClose: () => void;
 };
 
 // 登录 overlay：承载 ZCode 远控页的 OAuth 授权页（chat.z.ai / bigmodel.cn）。
-// 主远控 WebView 不被打断，登录回调（zcode.z.ai）完成后自动关闭，
+// 主远控 WebView 不被打断，登录回调回到主 URL origin（zcode 页即 zcode.z.ai）后自动关闭，
 // 会话由远控页自身的轮询接管。
 
 const AUTO_CLOSE_DELAY_MS = 1500;
@@ -49,12 +51,28 @@ const windowOpenShim = `
 const WEBVIEW_UA =
   "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
 
-export default function AuthBrowserModal({ visible, initialUrl, onClose }: AuthBrowserModalProps) {
+export default function AuthBrowserModal({
+  visible,
+  initialUrl,
+  homeOrigin,
+  onClose,
+}: AuthBrowserModalProps) {
   const webViewRef = useRef<React.ComponentRef<typeof WebView>>(null);
   // RemoteShell 以 key={authUrl} 挂载本组件：每次新的授权 URL 都是一次全新挂载，
   // 状态天然从 props 初始化，无需在 effect 里同步。
   const [sourceUri, setSourceUri] = useState(initialUrl);
   const [completed, setCompleted] = useState(false);
+  const homeHost = useMemo(() => {
+    if (!homeOrigin) {
+      return null;
+    }
+
+    try {
+      return new URL(homeOrigin).hostname;
+    } catch {
+      return null;
+    }
+  }, [homeOrigin]);
 
   useEffect(() => {
     if (!completed) {
@@ -74,56 +92,66 @@ export default function AuthBrowserModal({ visible, initialUrl, onClose }: AuthB
     }
   }, []);
 
-  const shouldStartLoad = useCallback((request: Pick<WebViewNavigation, 'url'>) => {
-    // intent:// 一律接管：放行会被 Chromium 解析成外部 intent 直接拉起浏览器。
-    if (request.url.startsWith('intent:')) {
-      const target = resolveNavigationTarget(request.url);
-      const resolved = resolveIntentTargetUrl(request.url);
+  const shouldStartLoad = useCallback(
+    (request: Pick<WebViewNavigation, 'url'>) => {
+      // intent:// 一律接管：放行会被 Chromium 解析成外部 intent 直接拉起浏览器。
+      if (request.url.startsWith('intent:')) {
+        const target = resolveNavigationTarget(request.url, homeOrigin);
+        const resolved = resolveIntentTargetUrl(request.url);
 
-      if ((target === 'auth' || target === 'webview') && resolved) {
-        setSourceUri(resolved);
-      } else if (target === 'system' && resolved) {
-        void openExternal(resolved);
+        if ((target === 'auth' || target === 'webview') && resolved) {
+          setSourceUri(resolved);
+        } else if (target === 'system' && resolved) {
+          void openExternal(resolved);
+        }
+
+        return true;
       }
 
-      return true;
-    }
+      const target = resolveNavigationTarget(request.url, homeOrigin);
 
-    const target = resolveNavigationTarget(request.url);
-
-    if (target === 'webview' || target === 'auth') {
-      return true;
-    }
-
-    if (target === 'system') {
-      void openExternal(request.url);
-    }
-
-    return false;
-  }, [openExternal]);
-
-  const handleOpenWindow = useCallback((event: { nativeEvent: { targetUrl: string } }) => {
-    const url = event.nativeEvent.targetUrl;
-    const target = resolveNavigationTarget(url);
-
-    if (target === 'auth' || target === 'webview') {
-      setSourceUri(resolveIntentTargetUrl(url) ?? url);
-    } else if (target === 'system') {
-      void openExternal(url);
-    }
-  }, [openExternal]);
-
-  const handleNavigationStateChange = useCallback((event: { url: string }) => {
-    try {
-      const { hostname } = new URL(event.url);
-
-      if (hostname === 'zcode.z.ai') {
-        setCompleted(true);
+      if (target === 'webview' || target === 'auth') {
+        return true;
       }
-    } catch {
-      // ignore malformed navigation URLs
-    }
-  }, []);
+
+      if (target === 'system') {
+        void openExternal(request.url);
+      }
+
+      return false;
+    },
+    [homeOrigin, openExternal],
+  );
+
+  const handleOpenWindow = useCallback(
+    (event: { nativeEvent: { targetUrl: string } }) => {
+      const url = event.nativeEvent.targetUrl;
+      const target = resolveNavigationTarget(url, homeOrigin);
+
+      if (target === 'auth' || target === 'webview') {
+        setSourceUri(resolveIntentTargetUrl(url) ?? url);
+      } else if (target === 'system') {
+        void openExternal(url);
+      }
+    },
+    [homeOrigin, openExternal],
+  );
+
+  const handleNavigationStateChange = useCallback(
+    (event: { url: string }) => {
+      try {
+        const { hostname } = new URL(event.url);
+
+        // 登录回调回到主 URL origin（或 zcode 页的 zcode.z.ai）即视为完成。
+        if (hostname === 'zcode.z.ai' || (homeHost !== null && hostname === homeHost)) {
+          setCompleted(true);
+        }
+      } catch {
+        // ignore malformed navigation URLs
+      }
+    },
+    [homeHost],
+  );
 
   if (!initialUrl) {
     return null;
@@ -160,6 +188,7 @@ export default function AuthBrowserModal({ visible, initialUrl, onClose }: AuthB
           source={{ uri: sourceUri ?? initialUrl }}
           style={styles.webView}
           originWhitelist={[
+            ...(homeOrigin ? [homeOrigin] : []),
             'https://zcode.z.ai',
             ...AUTH_ROOTS.map((root) => `https://*.${root}`),
             ...AUTH_ROOTS.map((root) => `https://${root}`),

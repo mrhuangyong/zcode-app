@@ -18,6 +18,15 @@ function createDeviceId(): string {
   return `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// 未带 ?name= 参数时用主机名作为默认设备名（任意远控 URL 下更好辨识）。
+function hostnameOf(url: string): string | null {
+  try {
+    return new URL(url).hostname || null;
+  } catch {
+    return null;
+  }
+}
+
 function sanitizeDevices(raw: unknown): RemoteDevice[] {
   if (!Array.isArray(raw)) {
     return [];
@@ -139,7 +148,7 @@ export async function upsertDevice(url: string): Promise<RemoteDevice | null> {
   const device: RemoteDevice = {
     id: createDeviceId(),
     url: normalized,
-    name: extractDeviceName(normalized) ?? 'ZCode Remote',
+    name: extractDeviceName(normalized) ?? hostnameOf(normalized) ?? 'ZCode Remote',
     createdAt: now,
     lastConnectedAt: now,
   };

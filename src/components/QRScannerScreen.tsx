@@ -45,7 +45,7 @@ export default function QRScannerScreen({
 
       if (!target) {
         handledPayloadRef.current = data;
-        setError('二维码无效：请扫描 ZCode 桌面端当前生成的连接二维码。');
+        setError('二维码无效：请扫描包含 http(s) 远控链接或 zcode-mobile 深链的二维码。');
         return;
       }
 
@@ -222,7 +222,7 @@ export default function QRScannerScreen({
               {error}
             </Text>
           ) : (
-            <Text style={styles.footerText}>仅识别 ZCode 官方远控二维码，链接会保存在本机安全存储。</Text>
+            <Text style={styles.footerText}>识别含 http(s) 远控链接的二维码，链接会保存在本机安全存储。</Text>
           )}
         </View>
       </SafeAreaView>

@@ -1,7 +1,12 @@
+import { isHomeOrigin } from './remote-url';
+
 export type NavigationTarget = 'webview' | 'auth' | 'system' | 'blocked';
 
 const SYSTEM_SCHEMES = new Set(['https:', 'http:', 'mailto:', 'tel:', 'sms:']);
 const WEBVIEW_INTERNAL_SCHEMES = new Set(['about:', 'data:', 'blob:']);
+
+// 未指定主 origin 时的兜底（兼容旧调用方与既有测试语义）。
+const DEFAULT_HOME_ORIGIN = 'https://zcode.z.ai';
 
 // ZCode 远控页的 OAuth 授权根域（来自 web 端构建产物）：
 // zai → chat.z.ai，bigmodel → bigmodel.cn。根域及其子域（www./open. 等登录跳转）都在
@@ -38,11 +43,12 @@ export function resolveIntentTargetUrl(rawUrl: string): string | null {
   return scheme.endsWith(':') ? `${scheme}//${body}` : `${scheme}://${body}`;
 }
 
-function classify(rawUrl: string): NavigationTarget {
+function classify(rawUrl: string, homeOrigin: string): NavigationTarget {
   try {
     const url = new URL(rawUrl);
 
-    if (url.protocol === 'https:' && url.hostname === 'zcode.z.ai') {
+    // 主 URL origin（用户添加的远控页）的站内导航留在 WebView。
+    if (isHomeOrigin(rawUrl, homeOrigin)) {
       return 'webview';
     }
 
@@ -56,14 +62,17 @@ function classify(rawUrl: string): NavigationTarget {
   }
 }
 
-export function resolveNavigationTarget(rawUrl: string): NavigationTarget {
+export function resolveNavigationTarget(
+  rawUrl: string,
+  homeOrigin: string = DEFAULT_HOME_ORIGIN,
+): NavigationTarget {
   if (WEBVIEW_INTERNAL_SCHEMES.has(rawUrl.slice(0, rawUrl.indexOf(':') + 1))) {
     return 'webview';
   }
 
   if (rawUrl.startsWith('intent:')) {
-    return classify(resolveIntentTargetUrl(rawUrl) ?? '');
+    return classify(resolveIntentTargetUrl(rawUrl) ?? '', homeOrigin);
   }
 
-  return classify(rawUrl);
+  return classify(rawUrl, homeOrigin);
 }
